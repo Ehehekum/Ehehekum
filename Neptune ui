@@ -1,12 +1,10 @@
--- Neptune UI Library (Mobile Compatible)
+-- Neptune UI Library (Mobile + Infinite Scroll)
 -- Author: ChatGPT
 local Lib = {}
 Lib.AccentColor = Color3.fromRGB(155,105,255)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
-local RS = game:GetService("RunService")
-
 local player = Players.LocalPlayer
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "NeptuneUILibrary"
@@ -40,11 +38,10 @@ notifContainer.BackgroundTransparency = 1
 notifContainer.Size = UDim2.new(1,0,1,0)
 notifContainer.Position = UDim2.new(0,0,0,0)
 
--- Tables
 local tabs = {}
 local currentTab = nil
 
--- Functions
+-- Create Tab Button
 local function createTabButton(name)
     local b = Instance.new("TextButton", tabBar)
     b.Size = UDim2.new(0,80,1,0)
@@ -57,13 +54,14 @@ local function createTabButton(name)
     return b
 end
 
+-- Switch Tab
 local function switchTo(tabName)
     if currentTab then tabs[currentTab].Page.Visible = false end
     currentTab = tabName
     tabs[currentTab].Page.Visible = true
 end
 
--- Public API
+-- Create Tab
 function Lib:CreateTab(name)
     if tabs[name] then return tabs[name] end
 
@@ -79,20 +77,21 @@ function Lib:CreateTab(name)
     local UIList = Instance.new("UIListLayout", page)
     UIList.Padding = UDim.new(0,6)
 
-    tabs[name] = {Button = tabButton, Page = page}
-
-    tabButton.MouseButton1Click:Connect(function()
-        switchTo(name)
+    -- Infinite scroll
+    UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0,0,0,UIList.AbsoluteContentSize.Y + 6)
     end)
 
+    tabs[name] = {Button = tabButton, Page = page}
+    tabButton.MouseButton1Click:Connect(function() switchTo(name) end)
     if not currentTab then switchTo(name) end
     return tabs[name]
 end
 
+-- Button
 function Lib:CreateButton(tabName, text, callback)
     local tab = tabs[tabName]
     if not tab then return end
-
     local btn = Instance.new("TextButton", tab.Page)
     btn.Font = Enum.Font.SourceSans
     btn.Size = UDim2.new(1,-8,0,28)
@@ -101,17 +100,14 @@ function Lib:CreateButton(tabName, text, callback)
     btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     btn.TextColor3 = Color3.new(1,1,1)
     btn.BorderSizePixel = 0
-
-    btn.MouseButton1Click:Connect(function()
-        pcall(callback)
-    end)
+    btn.MouseButton1Click:Connect(function() pcall(callback) end)
 end
 
+-- Toggle
 function Lib:CreateToggle(tabName, text, callback)
     local state = false
     local tab = tabs[tabName]
     if not tab then return end
-
     local btn = Instance.new("TextButton", tab.Page)
     btn.Font = Enum.Font.SourceSans
     btn.Size = UDim2.new(1,-8,0,28)
@@ -119,12 +115,10 @@ function Lib:CreateToggle(tabName, text, callback)
     btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     btn.TextColor3 = Color3.new(1,1,1)
     btn.BorderSizePixel = 0
-
     local function update()
         btn.Text = (state and "[ON] " or "[OFF] ")..text
         btn.TextColor3 = state and Lib.AccentColor or Color3.new(1,1,1)
     end
-
     update()
     btn.MouseButton1Click:Connect(function()
         state = not state
@@ -133,15 +127,14 @@ function Lib:CreateToggle(tabName, text, callback)
     end)
 end
 
+-- Slider
 function Lib:CreateSlider(tabName, text, minVal, maxVal, defaultVal, callback)
     local tab = tabs[tabName]
     if not tab then return end
-
     local sliderFrame = Instance.new("Frame", tab.Page)
     sliderFrame.Size = UDim2.new(1,-8,0,28)
     sliderFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
     sliderFrame.BorderSizePixel = 0
-
     local label = Instance.new("TextLabel", sliderFrame)
     label.Size = UDim2.new(0.6,0,1,0)
     label.Font = Enum.Font.SourceSans
@@ -150,27 +143,22 @@ function Lib:CreateSlider(tabName, text, minVal, maxVal, defaultVal, callback)
     label.TextColor3 = Color3.new(1,1,1)
     label.Text = text..": "..defaultVal
     label.BackgroundTransparency = 1
-
     local bar = Instance.new("Frame", sliderFrame)
     bar.BackgroundColor3 = Color3.fromRGB(25,25,25)
     bar.Position = UDim2.new(0.65,0,0.3,0)
     bar.Size = UDim2.new(0.32,0,0.4,0)
     bar.BorderSizePixel = 0
-
     local fill = Instance.new("Frame", bar)
     fill.Size = UDim2.new((defaultVal-minVal)/(maxVal-minVal),0,1,0)
     fill.BackgroundColor3 = Lib.AccentColor
     fill.BorderSizePixel = 0
-
     local function update(v)
         local ratio = (v-minVal)/(maxVal-minVal)
         fill.Size = UDim2.new(math.clamp(ratio,0,1),0,1,0)
         label.Text = text..": "..math.floor(v)
         callback(v)
     end
-
     local dragging = false
-
     bar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -191,14 +179,13 @@ function Lib:CreateSlider(tabName, text, minVal, maxVal, defaultVal, callback)
             update(val)
         end
     end)
-
     update(defaultVal)
 end
 
+-- Dropdown
 function Lib:CreateDropdown(tabName, text, list, callback)
     local tab = tabs[tabName]
     if not tab then return end
-
     local drop = Instance.new("TextButton", tab.Page)
     drop.Font = Enum.Font.SourceSans
     drop.Size = UDim2.new(1,-8,0,28)
@@ -207,21 +194,16 @@ function Lib:CreateDropdown(tabName, text, list, callback)
     drop.TextColor3 = Color3.new(1,1,1)
     drop.BackgroundColor3 = Color3.fromRGB(40,40,40)
     drop.BorderSizePixel = 0
-
     local open = false
     local optionButtons = {}
-
     local function closeDropdown()
         open = false
         drop.Text = text.." ▼"
         for _, b in pairs(optionButtons) do b:Destroy() end
         optionButtons = {}
     end
-
     drop.MouseButton1Click:Connect(function()
-        if open then
-            closeDropdown()
-        else
+        if open then closeDropdown() else
             open = true
             drop.Text = text.." ▲"
             for i,v in ipairs(list) do
@@ -242,8 +224,6 @@ function Lib:CreateDropdown(tabName, text, list, callback)
             end
         end
     end)
-
-    -- Close dropdown if clicked outside
     UIS.InputBegan:Connect(function(input)
         if open and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             local mousePos = input.Position
@@ -257,7 +237,7 @@ function Lib:CreateDropdown(tabName, text, list, callback)
     end)
 end
 
--- Notification
+-- Notifications
 function Lib:Notify(msg)
     local notif = Instance.new("TextLabel", notifContainer)
     notif.BackgroundColor3 = Color3.fromRGB(25,25,25)
@@ -269,16 +249,7 @@ function Lib:Notify(msg)
     notif.Font = Enum.Font.SourceSans
     notif.BorderSizePixel = 0
     notif.BackgroundTransparency = 0.1
-    task.delay(3,function()
-        notif:Destroy()
-    end)
+    task.delay(3,function() notif:Destroy() end)
 end
-
--- Example Tab + Elements
-Lib:CreateTab("Main")
-Lib:CreateButton("Main","Click Me",function() Lib:Notify("Button Clicked!") end)
-Lib:CreateToggle("Main","Enable Feature",function(state) print("Toggle:",state) end)
-Lib:CreateSlider("Main","Speed",0,100,50,function(val) print("Slider:",val) end)
-Lib:CreateDropdown("Main","Select Option",{"Option1","Option2","Option3"},function(sel) print("Selected:",sel) end)
 
 return Lib
