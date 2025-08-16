@@ -1,21 +1,60 @@
--- Neptune-inspired Notification UI for Roblox
+-- Advanced Notification UI for Roblox
 local NotificationUI = {}
 
 -- Services
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local SoundService = game:GetService("SoundService")
 
--- Configuration
+-- Theme Definitions
+local THEMES = {
+    Scene = {
+        BackgroundColor = Color3.fromRGB(40, 40, 40),
+        TextColor = Color3.fromRGB(255, 255, 255),
+        AccentColor = Color3.fromRGB(255, 100, 100),
+        Gradient = true, -- Uses UIGradient
+        Font = Enum.Font.GothamBold,
+    },
+    Space = {
+        BackgroundColor = Color3.fromRGB(10, 10, 20),
+        TextColor = Color3.fromRGB(200, 200, 255),
+        AccentColor = Color3.fromRGB(100, 150, 255),
+        Gradient = false,
+        Font = Enum.Font.FredokaOne,
+        StarEffect = true, -- Adds subtle star-like transparency flicker
+    },
+    Rainbow = {
+        BackgroundColor = Color3.fromRGB(50, 50, 50),
+        TextColor = Color3.fromRGB(255, 255, 255),
+        AccentColor = Color3.fromRGB(255, 255, 255), -- Overridden by rainbow gradient
+        Gradient = "Rainbow", -- Special rainbow animation
+        Font = Enum.Font.Arcade,
+    },
+    Goth = {
+        BackgroundColor = Color3.fromRGB(20, 20, 20),
+        TextColor = Color3.fromRGB(200, 150, 200),
+        AccentColor = Color3.fromRGB(100, 0, 100),
+        Gradient = false,
+        Font = Enum.Font.GothamBlack,
+    },
+    Ocean = {
+        BackgroundColor = Color3.fromRGB(0, 50, 100),
+        TextColor = Color3.fromRGB(200, 255, 255),
+        AccentColor = Color3.fromRGB(0, 150, 200),
+        Gradient = false,
+        Font = Enum.Font.SourceSansPro,
+        WaveEffect = true, -- Wave-like animation for progress bar
+    }
+}
+
+-- Default Configuration
 local CONFIG = {
-    Duration = 5, -- Notification duration (seconds)
     FadeTime = 0.5, -- Fade animation time
     SlideTime = 0.7, -- Slide animation time
-    BackgroundColor = Color3.fromRGB(30, 30, 30), -- Dark background
-    TextColor = Color3.fromRGB(255, 255, 255), -- White text
-    AccentColor = Color3.fromRGB(0, 170, 255), -- Blue progress bar
-    Font = Enum.Font.GothamBold, -- Title font
     CornerRadius = UDim.new(0, 10), -- Rounded corners
     MaxNotifications = 5, -- Max concurrent notifications
+    DefaultPosition = "TopRight", -- Options: TopRight, BottomRight
+    DefaultSoundId = "rbxassetid://9120386446", -- Default Roblox notification sound
 }
 
 -- Local player and GUI
@@ -33,15 +72,28 @@ local activeNotifications = _G.activeNotifications or 0
 _G.activeNotifications = activeNotifications
 
 -- Create a notification
-function NotificationUI:Notify(title, description)
-    title = title or "Notification"
-    description = description or "This is a default notification."
+function NotificationUI:Notify(options)
+    -- Default options
+    options = options or {}
+    local title = options.Title or "Notification"
+    local description = options.Description or "This is a default notification."
+    local duration = options.Duration or 5
+    local theme = THEMES[options.Theme or "Scene"] or THEMES.Scene
+    local soundId = options.SoundId or CONFIG.DefaultSoundId
+    local position = options.Position or CONFIG.DefaultPosition
+    local fadeTime = options.FadeTime or CONFIG.FadeTime
+    local slideTime = options.SlideTime or CONFIG.SlideTime
+
+    -- Calculate position
+    local yOffset = position == "BottomRight" and (1 - (activeNotifications * 0.15)) or (0 + (activeNotifications * 0.15))
+    local startPos = position == "BottomRight" and UDim2.new(1, 20, 1, -120) or UDim2.new(1, 20, 0, 20 + (activeNotifications * 120))
+    local endPos = position == "BottomRight" and UDim2.new(1, -320, 1, -120) or UDim2.new(1, -320, 0, 20 + (activeNotifications * 120))
 
     -- Create notification frame
     local notificationFrame = Instance.new("Frame")
     notificationFrame.Size = UDim2.new(0, 300, 0, 100)
-    notificationFrame.Position = UDim2.new(1, 20, 0, 20 + (activeNotifications * 120))
-    notificationFrame.BackgroundColor3 = CONFIG.BackgroundColor
+    notificationFrame.Position = startPos
+    notificationFrame.BackgroundColor3 = theme.BackgroundColor
     notificationFrame.BorderSizePixel = 0
     notificationFrame.ClipsDescendants = true
     notificationFrame.Parent = screenGui
@@ -51,14 +103,36 @@ function NotificationUI:Notify(title, description)
     uiCorner.CornerRadius = CONFIG.CornerRadius
     uiCorner.Parent = notificationFrame
 
+    -- Gradient for Scene or Rainbow theme
+    if theme.Gradient then
+        local uiGradient = Instance.new("UIGradient")
+        uiGradient.Parent = notificationFrame
+        if theme.Gradient == "Rainbow" then
+            -- Rainbow animation
+            uiGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 255, 0)),
+                ColorSequenceKeypoint.new(0.4, Color3.fromRGB(0, 255, 0)),
+                ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(0.8, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))
+            })
+            local tween = TweenService:Create(uiGradient, TweenInfo.new(2, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1), {Rotation = 360})
+            tween:Play()
+        else
+            -- Scene gradient
+            uiGradient.Color = ColorSequence.new(theme.BackgroundColor, Color3.fromRGB(theme.BackgroundColor.R * 255 * 0.7, theme.BackgroundColor.G * 255 * 0.7, theme.BackgroundColor.B * 255 * 0.7))
+        end
+    end
+
     -- Title label
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(0.9, 0, 0, 30)
     titleLabel.Position = UDim2.new(0.05, 0, 0, 10)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title
-    titleLabel.TextColor3 = CONFIG.TextColor
-    titleLabel.Font = CONFIG.Font
+    titleLabel.TextColor3 = theme.TextColor
+    titleLabel.Font = theme.Font
     titleLabel.TextSize = 18
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = notificationFrame
@@ -69,8 +143,8 @@ function NotificationUI:Notify(title, description)
     descLabel.Position = UDim2.new(0.05, 0, 0, 40)
     descLabel.BackgroundTransparency = 1
     descLabel.Text = description
-    descLabel.TextColor3 = CONFIG.TextColor
-    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextColor3 = theme.TextColor
+    descLabel.Font = theme.Font == Enum.Font.GothamBold and Enum.Font.Gotham or theme.Font
     descLabel.TextSize = 14
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
     descLabel.TextWrapped = true
@@ -80,26 +154,45 @@ function NotificationUI:Notify(title, description)
     local progressBar = Instance.new("Frame")
     progressBar.Size = UDim2.new(1, 0, 0, 4)
     progressBar.Position = UDim2.new(0, 0, 1, -4)
-    progressBar.BackgroundColor3 = CONFIG.AccentColor
+    progressBar.BackgroundColor3 = theme.AccentColor
     progressBar.BorderSizePixel = 0
     progressBar.Parent = notificationFrame
 
+    -- Wave effect for Ocean theme
+    if theme.WaveEffect then
+        local waveTween = TweenService:Create(progressBar, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Position = UDim2.new(0, 0, 1, -8)})
+        waveTween:Play()
+    end
+
+    -- Star effect for Space theme
+    if theme.StarEffect then
+        local flickerTween = TweenService:Create(notificationFrame, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), {BackgroundTransparency = 0.3})
+        flickerTween:Play()
+    end
+
+    -- Play sound
+    if soundId then
+        local sound = Instance.new("Sound")
+        sound.SoundId = soundId
+        sound.Volume = 0.5
+        sound.Parent = SoundService
+        sound:Play()
+        game.Debris:AddItem(sound, 5)
+    end
+
     -- Animations
-    local tweenInfo = TweenInfo.new(CONFIG.SlideTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local fadeInInfo = TweenInfo.new(CONFIG.FadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
-    local slideIn = TweenService:Create(notificationFrame, tweenInfo, {
-        Position = UDim2.new(1, -320, 0, notificationFrame.Position.Y.Offset)
-    })
-    local fadeIn = TweenService:Create(notificationFrame, fadeInInfo, {BackgroundTransparency = 0.1})
+    local tweenInfo = TweenInfo.new(slideTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local fadeInInfo = TweenInfo.new(fadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+    local slideIn = TweenService:Create(notificationFrame, tweenInfo, {Position = endPos})
+    local fadeIn = TweenService:Create(notificationFrame, fadeInInfo, {BackgroundTransparency = theme.StarEffect and 0.1 or 0.1})
     local fadeInTitle = TweenService:Create(titleLabel, fadeInInfo, {TextTransparency = 0})
     local fadeInDesc = TweenService:Create(descLabel, fadeInInfo, {TextTransparency = 0})
-    local scaleProgress = TweenService:Create(progressBar, TweenInfo.new(CONFIG.Duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 4)})
+    local scaleProgress = TweenService:Create(progressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 4)})
 
     -- Initial states
     notificationFrame.BackgroundTransparency = 1
     titleLabel.TextTransparency = 1
-    descLabel.TextTransparency = 1
-    notificationFrame.Position = UDim2.new(1, 20, 0, notificationFrame.Position.Y.Offset)
+    desc SlovenskoLabel.TextTransparency = 1
 
     -- Play animations
     slideIn:Play()
@@ -111,16 +204,23 @@ function NotificationUI:Notify(title, description)
     activeNotifications = activeNotifications + 1
     _G.activeNotifications = activeNotifications
 
-    -- Auto-dismiss
-    scaleProgress:Play()
-    scaleProgress.Completed:Connect(function()
-        local fadeOutInfo = TweenInfo.new(CONFIG.FadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+    -- Click-to-dismiss
+    local clickButton = Instance.new("TextButton")
+    clickButton.Size = UDim2.new(1, 0, 1, 0)
+    clickButton.BackgroundTransparency = 1
+    clickButton.Text = ""
+    clickButton.Parent = notificationFrame
+
+    -- Auto-dismiss or click-to-dismiss
+    local dismissed = false
+    local function dismiss()
+        if dismissed then return end
+        dismissed = true
+        local fadeOutInfo = TweenInfo.new(fadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
         local fadeOut = TweenService:Create(notificationFrame, fadeOutInfo, {BackgroundTransparency = 1})
         local fadeOutTitle = TweenService:Create(titleLabel, fadeOutInfo, {TextTransparency = 1})
         local fadeOutDesc = TweenService:Create(descLabel, fadeOutInfo, {TextTransparency = 1})
-        local slideOut = TweenService:Create(notificationFrame, tweenInfo, {
-            Position = UDim2.new(1, 20, 0, notificationFrame.Position.Y.Offset)
-        })
+        local slideOut = TweenService:Create(notificationFrame, tweenInfo, {Position = startPos})
 
         fadeOut:Play()
         fadeOutTitle:Play()
@@ -134,8 +234,9 @@ function NotificationUI:Notify(title, description)
             -- Update positions
             for i, frame in ipairs(notificationQueue) do
                 if frame and frame.Parent then
+                    local yPos = position == "BottomRight" and (1 - ((i - 1) * 0.15)) or (0 + ((i - 1) * 0.15))
                     local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-                        Position = UDim2.new(1, -320, 0, 20 + ((i - 1) * 120))
+                        Position = position == "BottomRight" and UDim2.new(1, -320, 1, -120 - ((i - 1) * 120)) or UDim2.new(1, -320, 0, 20 + ((i - 1) * 120))
                     })
                     tween:Play()
                 end
@@ -147,7 +248,11 @@ function NotificationUI:Notify(title, description)
                 end
             end
         end)
-    end)
+    end
+
+    clickButton.MouseButton1Click:Connect(dismiss)
+    scaleProgress:Play()
+    scaleProgress.Completed:Connect(dismiss)
 
     -- Add to queue
     table.insert(notificationQueue, notificationFrame)
@@ -166,5 +271,10 @@ end
 -- Expose globally
 _G.Notify = NotificationUI.Notify
 
--- Return the table for library-style usage
+-- Example notifications
+NotificationUI:Notify({Title = "Welcome!", Description = "Loaded the notification UI!", Theme = "Scene"})
+wait(2)
+NotificationUI:Notify({Title = "Update", Description = "Try the new themes!", Theme = "Rainbow", Duration = 7, SoundId = "rbxassetid://9120386446"})
+
+-- Return the table
 return NotificationUI
