@@ -1,0 +1,182 @@
+-- NeptuneUI Library
+local NeptuneUI = {}
+NeptuneUI.__index = NeptuneUI
+
+-- Services
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+-- Create a new UI library instance
+function NeptuneUI:New(ScreenGuiName)
+    local self = setmetatable({}, NeptuneUI)
+    self.ScreenGui = Instance.new("ScreenGui")
+    self.ScreenGui.Name = ScreenGuiName or "NeptuneUI"
+    self.ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    self.ScreenGui.ResetOnSpawn = false
+    return self
+end
+
+-- Create a draggable window
+function NeptuneUI:CreateWindow(Title, Size, Position)
+    local Window = {}
+    Window.Frame = Instance.new("Frame")
+    Window.Frame.Size = Size or UDim2.new(0, 300, 0, 400)
+    Window.Frame.Position = Position or UDim2.new(0.5, -150, 0.5, -200)
+    Window.Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Window.Frame.BorderSizePixel = 0
+    Window.Frame.Parent = self.ScreenGui
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Window.Frame
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+    TitleLabel.Position = UDim2.new(0, 0, 0, 0)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = Title or "NeptuneUI Window"
+    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TitleLabel.TextSize = 16
+    TitleLabel.Font = Enum.Font.SourceSansBold
+    TitleLabel.Parent = Window.Frame
+
+    -- Dragging functionality
+    local dragging, dragInput, dragStart, startPos
+    local function updateInput(input)
+        local delta = input.Position - dragStart
+        Window.Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    Window.Frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = Window.Frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    Window.Frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            updateInput(input)
+        end
+    end)
+
+    Window.Elements = {}
+    Window.NextPosition = UDim2.new(0, 10, 0, 40) -- For stacking elements vertically
+
+    -- Methods for adding elements to the window
+    function Window:AddButton(Text, Callback)
+        local Button = Instance.new("TextButton")
+        Button.Size = UDim2.new(1, -20, 0, 30)
+        Button.Position = Window.NextPosition
+        Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Button.Text = Text or "Button"
+        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Button.TextSize = 14
+        Button.Font = Enum.Font.SourceSans
+        Button.Parent = Window.Frame
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = Button
+
+        Button.MouseButton1Click:Connect(function()
+            if Callback then
+                Callback()
+            end
+        end)
+
+        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 40)
+        table.insert(Window.Elements, Button)
+    end
+
+    function Window:AddLabel(Text)
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -20, 0, 20)
+        Label.Position = Window.NextPosition
+        Label.BackgroundTransparency = 1
+        Label.Text = Text or "Label"
+        Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+        Label.TextSize = 14
+        Label.Font = Enum.Font.SourceSans
+        Label.Parent = Window.Frame
+
+        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 30)
+        table.insert(Window.Elements, Label)
+    end
+
+    function Window:AddToggle(Text, Default, Callback)
+        local Toggle = Instance.new("TextButton")
+        Toggle.Size = UDim2.new(1, -20, 0, 30)
+        Toggle.Position = Window.NextPosition
+        Toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Toggle.Text = Text or "Toggle: " .. (Default and "On" or "Off")
+        Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Toggle.TextSize = 14
+        Toggle.Font = Enum.Font.SourceSans
+        Toggle.Parent = Window.Frame
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = Toggle
+
+        local State = Default or false
+        Toggle.MouseButton1Click:Connect(function()
+            State = not State
+            Toggle.Text = Text or "Toggle: " .. (State and "On" or "Off")
+            Toggle.BackgroundColor3 = State and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(50, 50, 50)
+            if Callback then
+                Callback(State)
+            end
+        end)
+
+        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 40)
+        table.insert(Window.Elements, Toggle)
+    end
+
+    return Window
+end
+
+-- Notify function (similar to your example)
+function NeptuneUI:Notify(Text, Duration)
+    local Notification = Instance.new("Frame")
+    Notification.Size = UDim2.new(0, 200, 0, 50)
+    Notification.Position = UDim2.new(1, -210, 1, -60)
+    Notification.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Notification.BorderSizePixel = 0
+    Notification.Parent = self.ScreenGui
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Notification
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, 0, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.Text = Text or "Notification"
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 14
+    Label.Font = Enum.Font.SourceSans
+    Label.Parent = Notification
+
+    spawn(function()
+        wait(Duration or 3)
+        local tween = TweenService:Create(Notification, TweenInfo.new(0.5), {Position = UDim2.new(1, 0, 1, -60)})
+        tween:Play()
+        tween.Completed:Wait()
+        Notification:Destroy()
+    end)
+end
+
+return NeptuneUI
