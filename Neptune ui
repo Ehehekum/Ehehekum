@@ -1,5 +1,5 @@
--- SimpleUI Library for Roblox
-local SimpleUI = {}
+-- Neptune UI Library for Roblox
+local NeptuneUI = {}
 
 -- Services
 local TweenService = game:GetService("TweenService")
@@ -8,13 +8,14 @@ local CoreGui = game:GetService("CoreGui")
 
 -- Colors
 local COLORS = {
-    Background = Color3.fromRGB(20, 20, 20),
-    Header = Color3.fromRGB(30, 30, 30),
-    Button = Color3.fromRGB(35, 35, 35),
-    ButtonHover = Color3.fromRGB(45, 45, 45),
-    Accent = Color3.fromRGB(100, 100, 255),
-    TextPrimary = Color3.fromRGB(240, 240, 240),
-    TextSecondary = Color3.fromRGB(180, 180, 180)
+    Background = Color3.fromRGB(25, 25, 25),
+    Header = Color3.fromRGB(35, 35, 35),
+    Accent = Color3.fromRGB(0, 120, 255),
+    Button = Color3.fromRGB(40, 40, 40),
+    ButtonHover = Color3.fromRGB(50, 50, 50),
+    TextPrimary = Color3.fromRGB(255, 255, 255),
+    TextSecondary = Color3.fromRGB(200, 200, 200),
+    Dropdown = Color3.fromRGB(30, 30, 30)
 }
 
 -- Utility: Create UICorner
@@ -26,11 +27,11 @@ local function createCorner(parent, radius)
 end
 
 -- Create Window
-function SimpleUI:CreateWindow(config)
+function NeptuneUI:CreateWindow(config)
     local window = {}
-    local name = config.Name or "SimpleUI"
-    local size = config.Size or UDim2.new(0, 400, 0, 500)
-    local position = config.Position or UDim2.new(0.5, -200, 0.5, -250)
+    local name = config.Name or "Neptune UI"
+    local size = config.Size or UDim2.new(0, 450, 0, 550)
+    local position = config.Position or UDim2.new(0.5, -225, 0.5, -275)
 
     -- Remove old GUI
     local old = CoreGui:FindFirstChild(name)
@@ -50,37 +51,37 @@ function SimpleUI:CreateWindow(config)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.Parent = screenGui
-    createCorner(mainFrame, 10)
+    createCorner(mainFrame, 12)
 
     -- Header
     local header = Instance.new("Frame")
-    header.Size = UDim2.new(1, 0, 0, 40)
+    header.Size = UDim2.new(1, 0, 0, 45)
     header.BackgroundColor3 = COLORS.Header
     header.BorderSizePixel = 0
     header.Parent = mainFrame
-    createCorner(header, 10)
+    createCorner(header, 12)
 
     -- Title
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -80, 1, 0)
+    title.Size = UDim2.new(1, -90, 1, 0)
     title.Position = UDim2.new(0, 15, 0, 0)
     title.BackgroundTransparency = 1
     title.Text = name
     title.TextColor3 = COLORS.TextPrimary
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
+    title.TextSize = 18
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = header
 
     -- Close Button
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -40, 0.5, -15)
+    closeBtn.Size = UDim2.new(0, 35, 0, 35)
+    closeBtn.Position = UDim2.new(1, -45, 0.5, -17.5)
     closeBtn.BackgroundColor3 = COLORS.Button
     closeBtn.Text = "X"
     closeBtn.TextColor3 = COLORS.TextSecondary
     closeBtn.Font = Enum.Font.Gotham
-    closeBtn.TextSize = 14
+    closeBtn.TextSize = 16
     closeBtn.BorderSizePixel = 0
     closeBtn.Parent = header
     createCorner(closeBtn, 8)
@@ -88,9 +89,32 @@ function SimpleUI:CreateWindow(config)
         screenGui:Destroy()
     end)
 
+    -- Minimize Button
+    local minimizeBtn = Instance.new("TextButton")
+    minimizeBtn.Size = UDim2.new(0, 35, 0, 35)
+    minimizeBtn.Position = UDim2.new(1, -85, 0.5, -17.5)
+    minimizeBtn.BackgroundColor3 = COLORS.Button
+    minimizeBtn.Text = "-"
+    minimizeBtn.TextColor3 = COLORS.TextSecondary
+    minimizeBtn.Font = Enum.Font.Gotham
+    minimizeBtn.TextSize = 16
+    minimizeBtn.BorderSizePixel = 0
+    minimizeBtn.Parent = header
+    createCorner(minimizeBtn, 8)
+    local isMinimized = false
+    minimizeBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        local content = mainFrame:FindFirstChild("Content")
+        if content then
+            content.Visible = not isMinimized
+            mainFrame.Size = isMinimized and UDim2.new(0, 450, 0, 45) or size
+        end
+    end)
+
     -- Content
     local content = Instance.new("ScrollingFrame")
-    content.Size = UDim2.new(1, -20, 1, -50)
+    content.Name = "Content"
+    content.Size = UDim2.new(1, -20, 1, -55)
     content.Position = UDim2.new(0, 10, 0, 50)
     content.BackgroundTransparency = 1
     content.BorderSizePixel = 0
@@ -100,7 +124,7 @@ function SimpleUI:CreateWindow(config)
     content.Parent = mainFrame
 
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim2.new(0, 10)
+    layout.Padding = UDim.new(0, 10)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = content
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -139,51 +163,51 @@ function SimpleUI:CreateWindow(config)
 end
 
 -- Create Section
-function SimpleUI:CreateSection(window, name)
+function NeptuneUI:CreateSection(window, name)
     local section = Instance.new("Frame")
     section.Size = UDim2.new(1, 0, 0, 0)
     section.BackgroundTransparency = 1
     section.Parent = window.Content
 
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 25)
+    title.Size = UDim2.new(1, 0, 0, 30)
     title.BackgroundTransparency = 1
     title.Text = name
     title.TextColor3 = COLORS.TextPrimary
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 15
+    title.TextSize = 16
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = section
 
     local contentFrame = Instance.new("Frame")
     contentFrame.Size = UDim2.new(1, 0, 0, 0)
-    contentFrame.Position = UDim2.new(0, 0, 0, 25)
+    contentFrame.Position = UDim2.new(0, 0, 0, 30)
     contentFrame.BackgroundTransparency = 1
     contentFrame.Parent = section
 
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim2.new(0, 8)
+    layout.Padding = UDim.new(0, 8)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = contentFrame
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 25)
+        section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 30)
     end)
 
     return contentFrame
 end
 
 -- Create Button
-function SimpleUI:CreateButton(section, name, callback)
+function NeptuneUI:CreateButton(section, name, callback)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 35)
+    button.Size = UDim2.new(1, 0, 0, 40)
     button.BackgroundColor3 = COLORS.Button
     button.Text = name
     button.TextColor3 = COLORS.TextSecondary
     button.Font = Enum.Font.Gotham
-    button.TextSize = 14
+    button.TextSize = 15
     button.BorderSizePixel = 0
     button.Parent = section
-    createCorner(button, 6)
+    createCorner(button, 8)
 
     button.MouseEnter:Connect(function()
         TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = COLORS.ButtonHover}):Play()
@@ -199,44 +223,44 @@ function SimpleUI:CreateButton(section, name, callback)
 end
 
 -- Create Toggle
-function SimpleUI:CreateToggle(section, name, defaultValue, callback)
+function NeptuneUI:CreateToggle(section, name, defaultValue, callback)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 30)
+    container.Size = UDim2.new(1, 0, 0, 35)
     container.BackgroundTransparency = 1
     container.Parent = section
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -50, 1, 0)
+    label.Size = UDim2.new(1, -60, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = name
     label.TextColor3 = COLORS.TextSecondary
     label.Font = Enum.Font.Gotham
-    label.TextSize = 14
+    label.TextSize = 15
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
 
     local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0, 40, 0, 20)
-    toggle.Position = UDim2.new(1, -40, 0.5, -10)
-    toggle.BackgroundColor3 = defaultValue and COLORS.Accent or Color3.fromRGB(60, 60, 60)
+    toggle.Size = UDim2.new(0, 45, 0, 22)
+    toggle.Position = UDim2.new(1, -50, 0.5, -11)
+    toggle.BackgroundColor3 = defaultValue and COLORS.Accent or Color3.fromRGB(70, 70, 70)
     toggle.Text = ""
     toggle.BorderSizePixel = 0
     toggle.Parent = container
-    createCorner(toggle, 10)
+    createCorner(toggle, 11)
 
     local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 16, 0, 16)
-    knob.Position = defaultValue and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = defaultValue and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    knob.BackgroundColor3 = COLORS.TextPrimary
     knob.BorderSizePixel = 0
     knob.Parent = toggle
-    createCorner(knob, 8)
+    createCorner(knob, 9)
 
     local isOn = defaultValue or false
     toggle.MouseButton1Click:Connect(function()
         isOn = not isOn
-        local newColor = isOn and COLORS.Accent or Color3.fromRGB(60, 60, 60)
-        local newPos = isOn and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        local newColor = isOn and COLORS.Accent or Color3.fromRGB(70, 70, 70)
+        local newPos = isOn and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
         TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = newColor}):Play()
         TweenService:Create(knob, TweenInfo.new(0.2), {Position = newPos}):Play()
         if callback then
@@ -248,40 +272,40 @@ function SimpleUI:CreateToggle(section, name, defaultValue, callback)
 end
 
 -- Create Slider
-function SimpleUI:CreateSlider(section, name, minValue, maxValue, defaultValue, suffix, callback)
+function NeptuneUI:CreateSlider(section, name, minValue, maxValue, defaultValue, suffix, callback)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 45)
+    container.Size = UDim2.new(1, 0, 0, 50)
     container.BackgroundTransparency = 1
     container.Parent = section
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -80, 0, 20)
+    label.Size = UDim2.new(1, -90, 0, 25)
     label.BackgroundTransparency = 1
     label.Text = name
     label.TextColor3 = COLORS.TextSecondary
     label.Font = Enum.Font.Gotham
-    label.TextSize = 14
+    label.TextSize = 15
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
 
     local valueLabel = Instance.new("TextLabel")
-    valueLabel.Size = UDim2.new(0, 80, 0, 20)
-    valueLabel.Position = UDim2.new(1, -80, 0, 0)
+    valueLabel.Size = UDim2.new(0, 90, 0, 25)
+    valueLabel.Position = UDim2.new(1, -90, 0, 0)
     valueLabel.BackgroundTransparency = 1
     valueLabel.Text = tostring(defaultValue or minValue) .. (suffix or "")
     valueLabel.TextColor3 = COLORS.TextSecondary
     valueLabel.Font = Enum.Font.Gotham
-    valueLabel.TextSize = 12
+    valueLabel.TextSize = 14
     valueLabel.TextXAlignment = Enum.TextXAlignment.Right
     valueLabel.Parent = container
 
     local sliderBg = Instance.new("Frame")
-    sliderBg.Size = UDim2.new(1, 0, 0, 4)
-    sliderBg.Position = UDim2.new(0, 0, 0, 25)
-    sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    sliderBg.Size = UDim2.new(1, 0, 0, 6)
+    sliderBg.Position = UDim2.new(0, 0, 0, 30)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     sliderBg.BorderSizePixel = 0
     sliderBg.Parent = container
-    createCorner(sliderBg, 2)
+    createCorner(sliderBg, 3)
 
     local currentValue = defaultValue or minValue
     local sliderFill = Instance.new("Frame")
@@ -289,10 +313,122 @@ function SimpleUI:CreateSlider(section, name, minValue, maxValue, defaultValue, 
     sliderFill.BackgroundColor3 = COLORS.Accent
     sliderFill.BorderSizePixel = 0
     sliderFill.Parent = sliderBg
-    createCorner(sliderFill, 2)
+    createCorner(sliderFill, 3)
 
     local sliderKnob = Instance.new("Frame")
-    sliderKnob.Size = UDim2.new(0, 12, 0, 12)
+    sliderKnob.Size = UDim2.new(0, 14, 0, 14)
+    sliderKnob.Position = UDim2.new((currentValue - minValue) / (maxValue - minValue), -7, 0.5, -7)
+    sliderKnob.BackgroundColor3 = COLORS.TextPrimary
+    sliderKnob.BorderSizePixel = 0
+    sliderKnob.Parent = sliderBg
+    createCorner(sliderKnob, 7)
+
+    local dragging = false
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
+    end)
+    sliderBg.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            local mousePos = UserInputService:GetMouseLocation()
+            local sliderPos = sliderBg.AbsolutePosition
+            local sliderSize = sliderBg.AbsoluteSize
+            local relativePos = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+            currentValue = minValue + (maxValue - minValue) * relativePos
+            sliderFill.Size = UDim2.new(relativePos, 0, 1, 0)
+            sliderKnob.Position = UDim2.new(relativePos, -7, 0.5, -7)
+            valueLabel.Text = tostring(math.floor(currentValue)) .. (suffix or "")
+            if callback then
+                callback(currentValue)
+            end
+        end
+    end)
+    sliderBg.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    return sliderBg, function() return currentValue end
+end
+
+-- Create Dropdown
+function NeptuneUI:CreateDropdown(section, name, options, defaultOption, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 40)
+    container.BackgroundTransparency = 1
+    container.Parent = section
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -100, 0, 25)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = COLORS.TextSecondary
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 15
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local dropdownBtn = Instance.new("TextButton")
+    dropdownBtn.Size = UDim2.new(0, 150, 0, 30)
+    dropdownBtn.Position = UDim2.new(1, -155, 0.5, -15)
+    dropdownBtn.BackgroundColor3 = COLORS.Button
+    dropdownBtn.Text = defaultOption or options[1] or "Select"
+    dropdownBtn.TextColor3 = COLORS.TextSecondary
+    dropdownBtn.Font = Enum.Font.Gotham
+    dropdownBtn.TextSize = 14
+    dropdownBtn.BorderSizePixel = 0
+    dropdownBtn.Parent = container
+    createCorner(dropdownBtn, 8)
+
+    local dropdownFrame = Instance.new("Frame")
+    dropdownFrame.Size = UDim2.new(0, 150, 0, 0)
+    dropdownFrame.Position = UDim2.new(1, -155, 0, 35)
+    dropdownFrame.BackgroundColor3 = COLORS.Dropdown
+    dropdownFrame.BorderSizePixel = 0
+    dropdownFrame.Visible = false
+    dropdownFrame.Parent = container
+    createCorner(dropdownFrame, 8)
+
+    local dropdownLayout = Instance.new("UIListLayout")
+    dropdownLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    dropdownLayout.Padding = UDim.new(0, 4)
+    dropdownLayout.Parent = dropdownFrame
+
+    local selectedOption = defaultOption or options[1]
+    for i, option in ipairs(options) do
+        local optionBtn = Instance.new("TextButton")
+        optionBtn.Size = UDim2.new(1, 0, 0, 30)
+        optionBtn.BackgroundColor3 = COLORS.Button
+        optionBtn.Text = option
+        optionBtn.TextColor3 = COLORS.TextSecondary
+        optionBtn.Font = Enum.Font.Gotham
+        optionBtn.TextSize = 14
+        optionBtn.BorderSizePixel = 0
+        optionBtn.Parent = dropdownFrame
+        createCorner(optionBtn, 6)
+
+        optionBtn.MouseButton1Click:Connect(function()
+            selectedOption = option
+            dropdownBtn.Text = option
+            dropdownFrame.Visible = false
+            if callback then
+                callback(option)
+            end
+        end)
+    end
+
+    dropdownFrame.Size = UDim2.new(0, 150, 0, #options * 34)
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        dropdownFrame.Visible = not dropdownFrame.Visible
+    end)
+
+    return dropdownBtn, function() return selectedOption end
+end
+
+return NeptuneUI= UDim2.new(0, 12, 0, 12)
     sliderKnob.Position = UDim2.new((currentValue - minValue) / (maxValue - minValue), -6, 0.5, -6)
     sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     sliderKnob.BorderSizePixel = 0
