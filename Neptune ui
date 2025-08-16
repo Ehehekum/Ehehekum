@@ -1,255 +1,282 @@
--- Neptune UI Library (Mobile + Infinite Scroll)
--- Author: ChatGPT
-local Lib = {}
-Lib.AccentColor = Color3.fromRGB(155,105,255)
+-- ========================
+-- Neptune UI Library v2
+-- ========================
+local Neptune = {}
+Neptune.AccentColor = Color3.fromRGB(155,105,255)
+Neptune.Themes = {
+    Space = {Background = Color3.fromRGB(10,10,25), Accent = Color3.fromRGB(155,105,255)},
+    Ocean = {Background = Color3.fromRGB(0,50,100), Accent = Color3.fromRGB(0,150,200)},
+    Light = {Background = Color3.fromRGB(240,240,240), Accent = Color3.fromRGB(50,50,50)},
+    Dark = {Background = Color3.fromRGB(25,25,25), Accent = Color3.fromRGB(155,105,255)},
+    StylizedBlack = {Background = Color3.fromRGB(15,15,15), Accent = Color3.fromRGB(255,0,128)},
+    Scene = {Background = Color3.fromRGB(30,20,50), Accent = Color3.fromRGB(200,100,255)},
+    Colorful = {Background = Color3.fromRGB(20,20,20), Accent = Color3.fromRGB(255,170,0)},
+    Rainbow = {Background = Color3.fromRGB(25,25,25), Accent = "Rainbow"}
+}
 
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
-local player = Players.LocalPlayer
+
+-- ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "NeptuneUILibrary"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Main Window
+-- Main Frame
 local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0,420,0,260)
-mainFrame.Position = UDim2.new(0.35,0,0.35,0)
+mainFrame.Size = UDim2.new(0,500,0,350)
+mainFrame.Position = UDim2.new(0.25,0,0.25,0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+
+-- Hide/Show Toggle
+local hideToggle = Instance.new("ImageButton", screenGui)
+hideToggle.Size = UDim2.new(0,45,0,45)
+hideToggle.Position = UDim2.new(0,10,0,10)
+hideToggle.Image = "rbxassetid://6023426926"
+hideToggle.BackgroundColor3 = Color3.fromRGB(40,40,40)
+hideToggle.BorderSizePixel = 0
+local hidden = false
+hideToggle.MouseButton1Click:Connect(function()
+    hidden = not hidden
+    mainFrame.Visible = not hidden
+end)
+hideToggle.Active = true
+hideToggle.Draggable = true
 
 -- Tab Bar
 local tabBar = Instance.new("Frame", mainFrame)
-tabBar.Size = UDim2.new(1,0,0,28)
+tabBar.Size = UDim2.new(1,0,0,30)
 tabBar.BackgroundColor3 = Color3.fromRGB(20,20,20)
 tabBar.BorderSizePixel = 0
 
--- Tab Container
-local tabContainer = Instance.new("Frame", mainFrame)
-tabContainer.Size = UDim2.new(1,0,1,-28)
-tabContainer.Position = UDim2.new(0,0,0,28)
+-- Tab Container (infinite scroll)
+local tabContainer = Instance.new("ScrollingFrame", mainFrame)
+tabContainer.Size = UDim2.new(1,0,1,-30)
+tabContainer.Position = UDim2.new(0,0,0,30)
 tabContainer.BackgroundTransparency = 1
+tabContainer.ScrollBarThickness = 6
+local UIList = Instance.new("UIListLayout", tabContainer)
+UIList.Padding = UDim.new(0,5)
+UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    tabContainer.CanvasSize = UDim2.new(0,0,0,UIList.AbsoluteContentSize.Y + 10)
+end)
 
--- Notification Container
-local notifContainer = Instance.new("Frame", screenGui)
-notifContainer.BackgroundTransparency = 1
-notifContainer.Size = UDim2.new(1,0,1,0)
-notifContainer.Position = UDim2.new(0,0,0,0)
-
+-- Tabs table
 local tabs = {}
 local currentTab = nil
 
--- Create Tab Button
-local function createTabButton(name)
-    local b = Instance.new("TextButton", tabBar)
-    b.Size = UDim2.new(0,80,1,0)
-    b.Text = name
-    b.Font = Enum.Font.SourceSans
-    b.TextSize = 15
-    b.TextColor3 = Lib.AccentColor
-    b.BackgroundColor3 = Color3.fromRGB(20,20,20)
-    b.BorderSizePixel = 0
-    return b
+-- Notification system
+function Neptune:Notify(msg)
+    local notif = Instance.new("Frame", screenGui)
+    notif.Size = UDim2.new(0,250,0,40)
+    notif.Position = UDim2.new(1,0,0,50)
+    notif.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    notif.BorderSizePixel = 0
+    notif.AnchorPoint = Vector2.new(1,0)
+    notif.ClipsDescendants = true
+    local label = Instance.new("TextLabel", notif)
+    label.Size = UDim2.new(1,0,1,0)
+    label.BackgroundTransparency = 1
+    label.Text = msg
+    label.TextColor3 = Color3.new(1,1,1)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 16
+    local tweenIn = TweenService:Create(notif,TweenInfo.new(0.5),{Position=UDim2.new(1,-10,0,50)})
+    tweenIn:Play()
+    task.delay(3,function()
+        local tweenOut = TweenService:Create(notif,TweenInfo.new(0.5),{Position=UDim2.new(1,250,0,50)})
+        tweenOut:Play()
+        tweenOut.Completed:Wait()
+        notif:Destroy()
+    end)
 end
 
--- Switch Tab
-local function switchTo(tabName)
-    if currentTab then tabs[currentTab].Page.Visible = false end
-    currentTab = tabName
-    tabs[currentTab].Page.Visible = true
+-- Play interaction sound
+Neptune.SoundId = "rbxassetid://71235464943604"
+function Neptune:PlaySound()
+    if Neptune.SoundId then
+        local s = Instance.new("Sound", screenGui)
+        s.SoundId = Neptune.SoundId
+        s.Volume = 1
+        s:Play()
+        game.Debris:AddItem(s,2)
+    end
+end
+
+-- Theme setter
+function Neptune:SetTheme(themeName)
+    local theme = Neptune.Themes[themeName]
+    if not theme then return end
+    if theme.Accent == "Rainbow" then
+        RunService.RenderStepped:Connect(function()
+            local t = tick()*2
+            local r = (math.sin(t)*0.5+0.5)
+            local g = (math.sin(t+2)*0.5+0.5)
+            local b = (math.sin(t+4)*0.5+0.5)
+            Neptune.AccentColor = Color3.new(r,g,b)
+            for _,tab in pairs(tabs) do tab.Button.TextColor3 = Neptune.AccentColor end
+        end)
+    else
+        Neptune.AccentColor = theme.Accent
+        for _,tab in pairs(tabs) do tab.Button.TextColor3 = Neptune.AccentColor end
+    end
+    mainFrame.BackgroundColor3 = theme.Background
+    tabBar.BackgroundColor3 = theme.Background
 end
 
 -- Create Tab
-function Lib:CreateTab(name)
+function Neptune:CreateTab(name)
     if tabs[name] then return tabs[name] end
+    local b = Instance.new("TextButton", tabBar)
+    b.Size = UDim2.new(0,120,1,0)
+    b.Text = name
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 15
+    b.TextColor3 = Neptune.AccentColor
+    b.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    b.BorderSizePixel = 0
+    b.AutoButtonColor = true
 
-    local tabButton = createTabButton(name)
     local page = Instance.new("ScrollingFrame", tabContainer)
-    page.Name = name.."_Page"
     page.Size = UDim2.new(1,0,1,0)
-    page.CanvasSize = UDim2.new(0,0,0,0)
-    page.ScrollBarThickness = 4
     page.BackgroundTransparency = 1
     page.Visible = false
-
-    local UIList = Instance.new("UIListLayout", page)
-    UIList.Padding = UDim.new(0,6)
-
-    -- Infinite scroll
-    UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        page.CanvasSize = UDim2.new(0,0,0,UIList.AbsoluteContentSize.Y + 6)
+    page.CanvasSize = UDim2.new(0,0,0,0)
+    page.ScrollBarThickness = 6
+    local layout = Instance.new("UIListLayout", page)
+    layout.Padding = UDim.new(0,6)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 10)
     end)
 
-    tabs[name] = {Button = tabButton, Page = page}
-    tabButton.MouseButton1Click:Connect(function() switchTo(name) end)
-    if not currentTab then switchTo(name) end
+    tabs[name] = {Button = b, Page = page}
+    b.MouseButton1Click:Connect(function()
+        if currentTab then tabs[currentTab].Page.Visible = false end
+        currentTab = name
+        tabs[currentTab].Page.Visible = true
+        Neptune:PlaySound()
+    end)
+    if not currentTab then
+        currentTab = name
+        page.Visible = true
+    end
     return tabs[name]
 end
 
 -- Button
-function Lib:CreateButton(tabName, text, callback)
-    local tab = tabs[tabName]
-    if not tab then return end
+function Neptune:AddButton(tab,text,callback)
     local btn = Instance.new("TextButton", tab.Page)
-    btn.Font = Enum.Font.SourceSans
-    btn.Size = UDim2.new(1,-8,0,28)
-    btn.TextSize = 15
+    btn.Size = UDim2.new(1,0,0,35)
     btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 15
     btn.TextColor3 = Color3.new(1,1,1)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
     btn.BorderSizePixel = 0
-    btn.MouseButton1Click:Connect(function() pcall(callback) end)
+    btn.MouseButton1Click:Connect(function()
+        callback()
+        Neptune:PlaySound()
+    end)
+    btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(60,60,60) end)
+    btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(40,40,40) end)
+    return btn
 end
 
 -- Toggle
-function Lib:CreateToggle(tabName, text, callback)
-    local state = false
-    local tab = tabs[tabName]
-    if not tab then return end
-    local btn = Instance.new("TextButton", tab.Page)
-    btn.Font = Enum.Font.SourceSans
-    btn.Size = UDim2.new(1,-8,0,28)
-    btn.TextSize = 15
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.BorderSizePixel = 0
-    local function update()
-        btn.Text = (state and "[ON] " or "[OFF] ")..text
-        btn.TextColor3 = state and Lib.AccentColor or Color3.new(1,1,1)
-    end
-    update()
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        update()
-        pcall(callback, state)
-    end)
-end
-
--- Slider
-function Lib:CreateSlider(tabName, text, minVal, maxVal, defaultVal, callback)
-    local tab = tabs[tabName]
-    if not tab then return end
-    local sliderFrame = Instance.new("Frame", tab.Page)
-    sliderFrame.Size = UDim2.new(1,-8,0,28)
-    sliderFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    sliderFrame.BorderSizePixel = 0
-    local label = Instance.new("TextLabel", sliderFrame)
-    label.Size = UDim2.new(0.6,0,1,0)
-    label.Font = Enum.Font.SourceSans
-    label.TextSize = 15
-    label.TextXAlignment = Enum.TextXAlignment.Left
+function Neptune:AddToggle(tab,text,default,callback)
+    local frame = Instance.new("Frame", tab.Page)
+    frame.Size = UDim2.new(1,0,0,35)
+    frame.BackgroundTransparency = 1
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(0.7,0,1,0)
+    label.Text = text
     label.TextColor3 = Color3.new(1,1,1)
-    label.Text = text..": "..defaultVal
     label.BackgroundTransparency = 1
-    local bar = Instance.new("Frame", sliderFrame)
-    bar.BackgroundColor3 = Color3.fromRGB(25,25,25)
-    bar.Position = UDim2.new(0.65,0,0.3,0)
-    bar.Size = UDim2.new(0.32,0,0.4,0)
-    bar.BorderSizePixel = 0
-    local fill = Instance.new("Frame", bar)
-    fill.Size = UDim2.new((defaultVal-minVal)/(maxVal-minVal),0,1,0)
-    fill.BackgroundColor3 = Lib.AccentColor
-    fill.BorderSizePixel = 0
-    local function update(v)
-        local ratio = (v-minVal)/(maxVal-minVal)
-        fill.Size = UDim2.new(math.clamp(ratio,0,1),0,1,0)
-        label.Text = text..": "..math.floor(v)
-        callback(v)
-    end
-    local dragging = false
-    bar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-        end
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 15
+    local button = Instance.new("TextButton", frame)
+    button.Size = UDim2.new(0.3,0,1,0)
+    button.Position = UDim2.new(0.7,0,0,0)
+    button.Text = default and "ON" or "OFF"
+    button.BackgroundColor3 = default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
+    button.MouseButton1Click:Connect(function()
+        default = not default
+        button.Text = default and "ON" or "OFF"
+        button.BackgroundColor3 = default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
+        callback(default)
+        Neptune:PlaySound()
     end)
-    bar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    bar.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local mouseX = input.Position.X
-            local barPos = bar.AbsolutePosition.X
-            local barSize = bar.AbsoluteSize.X
-            local pct = (mouseX - barPos)/barSize
-            local val = minVal + ((maxVal-minVal)*(pct))
-            update(val)
-        end
-    end)
-    update(defaultVal)
+    return button
 end
 
 -- Dropdown
-function Lib:CreateDropdown(tabName, text, list, callback)
-    local tab = tabs[tabName]
-    if not tab then return end
-    local drop = Instance.new("TextButton", tab.Page)
-    drop.Font = Enum.Font.SourceSans
-    drop.Size = UDim2.new(1,-8,0,28)
-    drop.TextSize = 15
-    drop.Text = text.." ▼"
-    drop.TextColor3 = Color3.new(1,1,1)
-    drop.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    drop.BorderSizePixel = 0
-    local open = false
-    local optionButtons = {}
-    local function closeDropdown()
-        open = false
-        drop.Text = text.." ▼"
-        for _, b in pairs(optionButtons) do b:Destroy() end
-        optionButtons = {}
+function Neptune:AddDropdown(tab,text,options,callback)
+    local frame = Instance.new("Frame", tab.Page)
+    frame.Size = UDim2.new(1,0,0,35)
+    frame.BackgroundTransparency = 1
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(0.6,0,1,0)
+    label.Text = text
+    label.TextColor3 = Color3.new(1,1,1)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 15
+
+    local dropBtn = Instance.new("TextButton", frame)
+    dropBtn.Size = UDim2.new(0.4,0,1,0)
+    dropBtn.Position = UDim2.new(0.6,0,0,0)
+    dropBtn.Text = "Select"
+    dropBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    dropBtn.BorderSizePixel = 0
+
+    local dropFrame = Instance.new("ScrollingFrame", frame)
+    dropFrame.Size = UDim2.new(1,0,0,0)
+    dropFrame.Position = UDim2.new(0,0,1,0)
+    dropFrame.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    dropFrame.BorderSizePixel = 0
+    dropFrame.Visible = false
+    dropFrame.ClipsDescendants = true
+    dropFrame.ScrollBarThickness = 6
+
+    local layout = Instance.new("UIListLayout", dropFrame)
+    layout.Padding = UDim.new(0,3)
+
+    for _,opt in pairs(options) do
+        local btn = Instance.new("TextButton", dropFrame)
+        btn.Size = UDim2.new(1,0,0,25)
+        btn.Text = opt
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 14
+        btn.TextColor3 = Color3.new(1,1,1)
+        btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        btn.BorderSizePixel = 0
+        btn.MouseButton1Click:Connect(function()
+            dropBtn.Text = opt
+            callback(opt)
+            dropFrame.Visible = false
+            Neptune:PlaySound()
+        end)
+        btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(70,70,70) end)
+        btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(50,50,50) end)
     end
-    drop.MouseButton1Click:Connect(function()
-        if open then closeDropdown() else
-            open = true
-            drop.Text = text.." ▲"
-            for i,v in ipairs(list) do
-                local itm = Instance.new("TextButton", tab.Page)
-                itm.Size = UDim2.new(1,-8,0,24)
-                itm.Position = UDim2.new(0,0,0,28*i)
-                itm.Font = Enum.Font.SourceSans
-                itm.TextSize = 15
-                itm.Text = v
-                itm.TextColor3 = Lib.AccentColor
-                itm.BackgroundColor3 = Color3.fromRGB(35,35,35)
-                itm.BorderSizePixel = 0
-                itm.MouseButton1Click:Connect(function()
-                    callback(v)
-                    closeDropdown()
-                end)
-                table.insert(optionButtons,itm)
-            end
+
+    dropBtn.MouseButton1Click:Connect(function()
+        dropFrame.Visible = not dropFrame.Visible
+        local totalHeight = 0
+        for _,v in pairs(dropFrame:GetChildren()) do
+            if v:IsA("TextButton") then totalHeight = totalHeight + v.Size.Y.Offset + layout.Padding.Offset end
         end
+        dropFrame.Size = UDim2.new(1,0,0,math.min(totalHeight,150))
     end)
-    UIS.InputBegan:Connect(function(input)
-        if open and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            local mousePos = input.Position
-            local absPos = drop.AbsolutePosition
-            local absSize = drop.AbsoluteSize
-            if not (mousePos.X >= absPos.X and mousePos.X <= absPos.X+absSize.X and
-                    mousePos.Y >= absPos.Y and mousePos.Y <= absPos.Y+absSize.Y) then
-                closeDropdown()
-            end
-        end
-    end)
+    return dropBtn
 end
 
--- Notifications
-function Lib:Notify(msg)
-    local notif = Instance.new("TextLabel", notifContainer)
-    notif.BackgroundColor3 = Color3.fromRGB(25,25,25)
-    notif.Size = UDim2.new(0,250,0,30)
-    notif.Position = UDim2.new(0.5,-125,0,50)
-    notif.Text = msg
-    notif.TextColor3 = Color3.new(1,1,1)
-    notif.TextSize = 15
-    notif.Font = Enum.Font.SourceSans
-    notif.BorderSizePixel = 0
-    notif.BackgroundTransparency = 0.1
-    task.delay(3,function() notif:Destroy() end)
-end
-
-return Lib
+return Neptune
