@@ -1,282 +1,332 @@
--- ========================
--- Neptune UI Library v2
--- ========================
-local Neptune = {}
-Neptune.AccentColor = Color3.fromRGB(155,105,255)
-Neptune.Themes = {
-    Space = {Background = Color3.fromRGB(10,10,25), Accent = Color3.fromRGB(155,105,255)},
-    Ocean = {Background = Color3.fromRGB(0,50,100), Accent = Color3.fromRGB(0,150,200)},
-    Light = {Background = Color3.fromRGB(240,240,240), Accent = Color3.fromRGB(50,50,50)},
-    Dark = {Background = Color3.fromRGB(25,25,25), Accent = Color3.fromRGB(155,105,255)},
-    StylizedBlack = {Background = Color3.fromRGB(15,15,15), Accent = Color3.fromRGB(255,0,128)},
-    Scene = {Background = Color3.fromRGB(30,20,50), Accent = Color3.fromRGB(200,100,255)},
-    Colorful = {Background = Color3.fromRGB(20,20,20), Accent = Color3.fromRGB(255,170,0)},
-    Rainbow = {Background = Color3.fromRGB(25,25,25), Accent = "Rainbow"}
+-- SimpleUI Library for Roblox
+local SimpleUI = {}
+
+-- Services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Colors
+local COLORS = {
+    Background = Color3.fromRGB(20, 20, 20),
+    Header = Color3.fromRGB(30, 30, 30),
+    Button = Color3.fromRGB(35, 35, 35),
+    ButtonHover = Color3.fromRGB(45, 45, 45),
+    Accent = Color3.fromRGB(100, 100, 255),
+    TextPrimary = Color3.fromRGB(240, 240, 240),
+    TextSecondary = Color3.fromRGB(180, 180, 180)
 }
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UIS = game:GetService("UserInputService")
+-- Utility: Create UICorner
+local function createCorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius)
+    corner.Parent = parent
+    return corner
+end
 
--- ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "NeptuneUILibrary"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- Create Window
+function SimpleUI:CreateWindow(config)
+    local window = {}
+    local name = config.Name or "SimpleUI"
+    local size = config.Size or UDim2.new(0, 400, 0, 500)
+    local position = config.Position or UDim2.new(0.5, -200, 0.5, -250)
 
--- Main Frame
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0,500,0,350)
-mainFrame.Position = UDim2.new(0.25,0,0.25,0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.BorderSizePixel = 0
-mainFrame.ClipsDescendants = true
+    -- Remove old GUI
+    local old = CoreGui:FindFirstChild(name)
+    if old then old:Destroy() end
 
--- Hide/Show Toggle
-local hideToggle = Instance.new("ImageButton", screenGui)
-hideToggle.Size = UDim2.new(0,45,0,45)
-hideToggle.Position = UDim2.new(0,10,0,10)
-hideToggle.Image = "rbxassetid://6023426926"
-hideToggle.BackgroundColor3 = Color3.fromRGB(40,40,40)
-hideToggle.BorderSizePixel = 0
-local hidden = false
-hideToggle.MouseButton1Click:Connect(function()
-    hidden = not hidden
-    mainFrame.Visible = not hidden
-end)
-hideToggle.Active = true
-hideToggle.Draggable = true
+    -- ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = name
+    screenGui.Parent = CoreGui
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Tab Bar
-local tabBar = Instance.new("Frame", mainFrame)
-tabBar.Size = UDim2.new(1,0,0,30)
-tabBar.BackgroundColor3 = Color3.fromRGB(20,20,20)
-tabBar.BorderSizePixel = 0
+    -- Main Frame
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = size
+    mainFrame.Position = position
+    mainFrame.BackgroundColor3 = COLORS.Background
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Parent = screenGui
+    createCorner(mainFrame, 10)
 
--- Tab Container (infinite scroll)
-local tabContainer = Instance.new("ScrollingFrame", mainFrame)
-tabContainer.Size = UDim2.new(1,0,1,-30)
-tabContainer.Position = UDim2.new(0,0,0,30)
-tabContainer.BackgroundTransparency = 1
-tabContainer.ScrollBarThickness = 6
-local UIList = Instance.new("UIListLayout", tabContainer)
-UIList.Padding = UDim.new(0,5)
-UIList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    tabContainer.CanvasSize = UDim2.new(0,0,0,UIList.AbsoluteContentSize.Y + 10)
-end)
+    -- Header
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 40)
+    header.BackgroundColor3 = COLORS.Header
+    header.BorderSizePixel = 0
+    header.Parent = mainFrame
+    createCorner(header, 10)
 
--- Tabs table
-local tabs = {}
-local currentTab = nil
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -80, 1, 0)
+    title.Position = UDim2.new(0, 15, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = name
+    title.TextColor3 = COLORS.TextPrimary
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = header
 
--- Notification system
-function Neptune:Notify(msg)
-    local notif = Instance.new("Frame", screenGui)
-    notif.Size = UDim2.new(0,250,0,40)
-    notif.Position = UDim2.new(1,0,0,50)
-    notif.BackgroundColor3 = Color3.fromRGB(30,30,30)
-    notif.BorderSizePixel = 0
-    notif.AnchorPoint = Vector2.new(1,0)
-    notif.ClipsDescendants = true
-    local label = Instance.new("TextLabel", notif)
-    label.Size = UDim2.new(1,0,1,0)
-    label.BackgroundTransparency = 1
-    label.Text = msg
-    label.TextColor3 = Color3.new(1,1,1)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 16
-    local tweenIn = TweenService:Create(notif,TweenInfo.new(0.5),{Position=UDim2.new(1,-10,0,50)})
-    tweenIn:Play()
-    task.delay(3,function()
-        local tweenOut = TweenService:Create(notif,TweenInfo.new(0.5),{Position=UDim2.new(1,250,0,50)})
-        tweenOut:Play()
-        tweenOut.Completed:Wait()
-        notif:Destroy()
+    -- Close Button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -40, 0.5, -15)
+    closeBtn.BackgroundColor3 = COLORS.Button
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = COLORS.TextSecondary
+    closeBtn.Font = Enum.Font.Gotham
+    closeBtn.TextSize = 14
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Parent = header
+    createCorner(closeBtn, 8)
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui:Destroy()
     end)
-end
 
--- Play interaction sound
-Neptune.SoundId = "rbxassetid://71235464943604"
-function Neptune:PlaySound()
-    if Neptune.SoundId then
-        local s = Instance.new("Sound", screenGui)
-        s.SoundId = Neptune.SoundId
-        s.Volume = 1
-        s:Play()
-        game.Debris:AddItem(s,2)
-    end
-end
+    -- Content
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1, -20, 1, -50)
+    content.Position = UDim2.new(0, 10, 0, 50)
+    content.BackgroundTransparency = 1
+    content.BorderSizePixel = 0
+    content.ScrollBarThickness = 4
+    content.ScrollBarImageColor3 = COLORS.TextSecondary
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.Parent = mainFrame
 
--- Theme setter
-function Neptune:SetTheme(themeName)
-    local theme = Neptune.Themes[themeName]
-    if not theme then return end
-    if theme.Accent == "Rainbow" then
-        RunService.RenderStepped:Connect(function()
-            local t = tick()*2
-            local r = (math.sin(t)*0.5+0.5)
-            local g = (math.sin(t+2)*0.5+0.5)
-            local b = (math.sin(t+4)*0.5+0.5)
-            Neptune.AccentColor = Color3.new(r,g,b)
-            for _,tab in pairs(tabs) do tab.Button.TextColor3 = Neptune.AccentColor end
-        end)
-    else
-        Neptune.AccentColor = theme.Accent
-        for _,tab in pairs(tabs) do tab.Button.TextColor3 = Neptune.AccentColor end
-    end
-    mainFrame.BackgroundColor3 = theme.Background
-    tabBar.BackgroundColor3 = theme.Background
-end
-
--- Create Tab
-function Neptune:CreateTab(name)
-    if tabs[name] then return tabs[name] end
-    local b = Instance.new("TextButton", tabBar)
-    b.Size = UDim2.new(0,120,1,0)
-    b.Text = name
-    b.Font = Enum.Font.Gotham
-    b.TextSize = 15
-    b.TextColor3 = Neptune.AccentColor
-    b.BackgroundColor3 = Color3.fromRGB(20,20,20)
-    b.BorderSizePixel = 0
-    b.AutoButtonColor = true
-
-    local page = Instance.new("ScrollingFrame", tabContainer)
-    page.Size = UDim2.new(1,0,1,0)
-    page.BackgroundTransparency = 1
-    page.Visible = false
-    page.CanvasSize = UDim2.new(0,0,0,0)
-    page.ScrollBarThickness = 6
-    local layout = Instance.new("UIListLayout", page)
-    layout.Padding = UDim.new(0,6)
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim2.new(0, 10)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = content
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        page.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 10)
+        content.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
     end)
 
-    tabs[name] = {Button = b, Page = page}
-    b.MouseButton1Click:Connect(function()
-        if currentTab then tabs[currentTab].Page.Visible = false end
-        currentTab = name
-        tabs[currentTab].Page.Visible = true
-        Neptune:PlaySound()
+    -- Dragging
+    local dragging, dragStart, startPos
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+        end
     end)
-    if not currentTab then
-        currentTab = name
-        page.Visible = true
+    header.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    header.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    window.Content = content
+    window.ScreenGui = screenGui
+    return window
+end
+
+-- Create Section
+function SimpleUI:CreateSection(window, name)
+    local section = Instance.new("Frame")
+    section.Size = UDim2.new(1, 0, 0, 0)
+    section.BackgroundTransparency = 1
+    section.Parent = window.Content
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 25)
+    title.BackgroundTransparency = 1
+    title.Text = name
+    title.TextColor3 = COLORS.TextPrimary
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 15
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = section
+
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Size = UDim2.new(1, 0, 0, 0)
+    contentFrame.Position = UDim2.new(0, 0, 0, 25)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Parent = section
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim2.new(0, 8)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = contentFrame
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        section.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y + 25)
+    end)
+
+    return contentFrame
+end
+
+-- Create Button
+function SimpleUI:CreateButton(section, name, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 35)
+    button.BackgroundColor3 = COLORS.Button
+    button.Text = name
+    button.TextColor3 = COLORS.TextSecondary
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 14
+    button.BorderSizePixel = 0
+    button.Parent = section
+    createCorner(button, 6)
+
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = COLORS.ButtonHover}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = COLORS.Button}):Play()
+    end)
+    if callback then
+        button.MouseButton1Click:Connect(callback)
     end
-    return tabs[name]
-end
 
--- Button
-function Neptune:AddButton(tab,text,callback)
-    local btn = Instance.new("TextButton", tab.Page)
-    btn.Size = UDim2.new(1,0,0,35)
-    btn.Text = text
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 15
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    btn.BorderSizePixel = 0
-    btn.MouseButton1Click:Connect(function()
-        callback()
-        Neptune:PlaySound()
-    end)
-    btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(60,60,60) end)
-    btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(40,40,40) end)
-    return btn
-end
-
--- Toggle
-function Neptune:AddToggle(tab,text,default,callback)
-    local frame = Instance.new("Frame", tab.Page)
-    frame.Size = UDim2.new(1,0,0,35)
-    frame.BackgroundTransparency = 1
-    local label = Instance.new("TextLabel", frame)
-    label.Size = UDim2.new(0.7,0,1,0)
-    label.Text = text
-    label.TextColor3 = Color3.new(1,1,1)
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 15
-    local button = Instance.new("TextButton", frame)
-    button.Size = UDim2.new(0.3,0,1,0)
-    button.Position = UDim2.new(0.7,0,0,0)
-    button.Text = default and "ON" or "OFF"
-    button.BackgroundColor3 = default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
-    button.MouseButton1Click:Connect(function()
-        default = not default
-        button.Text = default and "ON" or "OFF"
-        button.BackgroundColor3 = default and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
-        callback(default)
-        Neptune:PlaySound()
-    end)
     return button
 end
 
--- Dropdown
-function Neptune:AddDropdown(tab,text,options,callback)
-    local frame = Instance.new("Frame", tab.Page)
-    frame.Size = UDim2.new(1,0,0,35)
-    frame.BackgroundTransparency = 1
-    local label = Instance.new("TextLabel", frame)
-    label.Size = UDim2.new(0.6,0,1,0)
-    label.Text = text
-    label.TextColor3 = Color3.new(1,1,1)
+-- Create Toggle
+function SimpleUI:CreateToggle(section, name, defaultValue, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 30)
+    container.BackgroundTransparency = 1
+    container.Parent = section
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -50, 1, 0)
     label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = COLORS.TextSecondary
     label.Font = Enum.Font.Gotham
-    label.TextSize = 15
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
 
-    local dropBtn = Instance.new("TextButton", frame)
-    dropBtn.Size = UDim2.new(0.4,0,1,0)
-    dropBtn.Position = UDim2.new(0.6,0,0,0)
-    dropBtn.Text = "Select"
-    dropBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-    dropBtn.BorderSizePixel = 0
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 40, 0, 20)
+    toggle.Position = UDim2.new(1, -40, 0.5, -10)
+    toggle.BackgroundColor3 = defaultValue and COLORS.Accent or Color3.fromRGB(60, 60, 60)
+    toggle.Text = ""
+    toggle.BorderSizePixel = 0
+    toggle.Parent = container
+    createCorner(toggle, 10)
 
-    local dropFrame = Instance.new("ScrollingFrame", frame)
-    dropFrame.Size = UDim2.new(1,0,0,0)
-    dropFrame.Position = UDim2.new(0,0,1,0)
-    dropFrame.BackgroundColor3 = Color3.fromRGB(35,35,35)
-    dropFrame.BorderSizePixel = 0
-    dropFrame.Visible = false
-    dropFrame.ClipsDescendants = true
-    dropFrame.ScrollBarThickness = 6
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = defaultValue and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = toggle
+    createCorner(knob, 8)
 
-    local layout = Instance.new("UIListLayout", dropFrame)
-    layout.Padding = UDim.new(0,3)
-
-    for _,opt in pairs(options) do
-        local btn = Instance.new("TextButton", dropFrame)
-        btn.Size = UDim2.new(1,0,0,25)
-        btn.Text = opt
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 14
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
-        btn.BorderSizePixel = 0
-        btn.MouseButton1Click:Connect(function()
-            dropBtn.Text = opt
-            callback(opt)
-            dropFrame.Visible = false
-            Neptune:PlaySound()
-        end)
-        btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(70,70,70) end)
-        btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(50,50,50) end)
-    end
-
-    dropBtn.MouseButton1Click:Connect(function()
-        dropFrame.Visible = not dropFrame.Visible
-        local totalHeight = 0
-        for _,v in pairs(dropFrame:GetChildren()) do
-            if v:IsA("TextButton") then totalHeight = totalHeight + v.Size.Y.Offset + layout.Padding.Offset end
+    local isOn = defaultValue or false
+    toggle.MouseButton1Click:Connect(function()
+        isOn = not isOn
+        local newColor = isOn and COLORS.Accent or Color3.fromRGB(60, 60, 60)
+        local newPos = isOn and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = newColor}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.2), {Position = newPos}):Play()
+        if callback then
+            callback(isOn)
         end
-        dropFrame.Size = UDim2.new(1,0,0,math.min(totalHeight,150))
     end)
-    return dropBtn
+
+    return toggle, function() return isOn end
 end
 
-return Neptune
+-- Create Slider
+function SimpleUI:CreateSlider(section, name, minValue, maxValue, defaultValue, suffix, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 45)
+    container.BackgroundTransparency = 1
+    container.Parent = section
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -80, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = COLORS.TextSecondary
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 80, 0, 20)
+    valueLabel.Position = UDim2.new(1, -80, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(defaultValue or minValue) .. (suffix or "")
+    valueLabel.TextColor3 = COLORS.TextSecondary
+    valueLabel.Font = Enum.Font.Gotham
+    valueLabel.TextSize = 12
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valueLabel.Parent = container
+
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, 0, 0, 4)
+    sliderBg.Position = UDim2.new(0, 0, 0, 25)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = container
+    createCorner(sliderBg, 2)
+
+    local currentValue = defaultValue or minValue
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((currentValue - minValue) / (maxValue - minValue), 0, 1, 0)
+    sliderFill.BackgroundColor3 = COLORS.Accent
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBg
+    createCorner(sliderFill, 2)
+
+    local sliderKnob = Instance.new("Frame")
+    sliderKnob.Size = UDim2.new(0, 12, 0, 12)
+    sliderKnob.Position = UDim2.new((currentValue - minValue) / (maxValue - minValue), -6, 0.5, -6)
+    sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sliderKnob.BorderSizePixel = 0
+    sliderKnob.Parent = sliderBg
+    createCorner(sliderKnob, 6)
+
+    local dragging = false
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
+    end)
+    sliderBg.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+            local mousePos = UserInputService:GetMouseLocation()
+            local sliderPos = sliderBg.AbsolutePosition
+            local sliderSize = sliderBg.AbsoluteSize
+            local relativePos = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
+            currentValue = minValue + (maxValue - minValue) * relativePos
+            sliderFill.Size = UDim2.new(relativePos, 0, 1, 0)
+            sliderKnob.Position = UDim2.new(relativePos, -6, 0.5, -6)
+            valueLabel.Text = tostring(math.floor(currentValue)) .. (suffix or "")
+            if callback then
+                callback(currentValue)
+            end
+        end
+    end)
+    sliderBg.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    return sliderBg, function() return currentValue end
+end
+
+return SimpleUI
