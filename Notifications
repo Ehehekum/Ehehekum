@@ -1,4 +1,6 @@
--- Advanced Notification UI for Roblox
+-- Debug Notification UI for Roblox
+print("Loading Notification UI...")
+
 local NotificationUI = {}
 
 -- Services
@@ -12,30 +14,30 @@ local THEMES = {
         BackgroundColor = Color3.fromRGB(40, 40, 40),
         TextColor = Color3.fromRGB(255, 255, 255),
         AccentColor = Color3.fromRGB(255, 100, 100),
-        Gradient = true, -- Uses UIGradient
-        Font = Enum.Font.GothamBold,
+        Gradient = true,
+        Font = Enum.Font.SourceSansPro, -- Fallback to safer font
     },
     Space = {
         BackgroundColor = Color3.fromRGB(10, 10, 20),
         TextColor = Color3.fromRGB(200, 200, 255),
         AccentColor = Color3.fromRGB(100, 150, 255),
         Gradient = false,
-        Font = Enum.Font.FredokaOne,
-        StarEffect = true, -- Adds subtle star-like transparency flicker
+        Font = Enum.Font.SourceSansPro,
+        StarEffect = true,
     },
     Rainbow = {
         BackgroundColor = Color3.fromRGB(50, 50, 50),
         TextColor = Color3.fromRGB(255, 255, 255),
-        AccentColor = Color3.fromRGB(255, 255, 255), -- Overridden by rainbow gradient
-        Gradient = "Rainbow", -- Special rainbow animation
-        Font = Enum.Font.Arcade,
+        AccentColor = Color3.fromRGB(255, 255, 255),
+        Gradient = "Rainbow",
+        Font = Enum.Font.SourceSansPro,
     },
     Goth = {
         BackgroundColor = Color3.fromRGB(20, 20, 20),
         TextColor = Color3.fromRGB(200, 150, 200),
         AccentColor = Color3.fromRGB(100, 0, 100),
         Gradient = false,
-        Font = Enum.Font.GothamBlack,
+        Font = Enum.Font.SourceSansPro,
     },
     Ocean = {
         BackgroundColor = Color3.fromRGB(0, 50, 100),
@@ -43,18 +45,18 @@ local THEMES = {
         AccentColor = Color3.fromRGB(0, 150, 200),
         Gradient = false,
         Font = Enum.Font.SourceSansPro,
-        WaveEffect = true, -- Wave-like animation for progress bar
+        WaveEffect = true,
     }
 }
 
 -- Default Configuration
 local CONFIG = {
-    FadeTime = 0.5, -- Fade animation time
-    SlideTime = 0.7, -- Slide animation time
-    CornerRadius = UDim.new(0, 10), -- Rounded corners
-    MaxNotifications = 5, -- Max concurrent notifications
-    DefaultPosition = "TopRight", -- Options: TopRight, BottomRight
-    DefaultSoundId = "rbxassetid://9120386446", -- Default Roblox notification sound
+    FadeTime = 0.5,
+    SlideTime = 0.7,
+    CornerRadius = UDim.new(0, 10),
+    MaxNotifications = 5,
+    DefaultPosition = "TopRight",
+    DefaultSoundId = "rbxassetid://9120386446",
 }
 
 -- Local player and GUI
@@ -64,6 +66,7 @@ local screenGui = playerGui:FindFirstChild("NotificationGui") or Instance.new("S
 screenGui.Name = "NotificationGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
+print("ScreenGui created")
 
 -- Notification queue
 local notificationQueue = _G.notificationQueue or {}
@@ -73,10 +76,10 @@ _G.activeNotifications = activeNotifications
 
 -- Create a notification
 function NotificationUI:Notify(options)
-    -- Default options
+    print("Creating notification...")
     options = options or {}
     local title = options.Title or "Notification"
-    local description = options.Description or "This is a default notification."
+    local description = options.Description or "Default notification."
     local duration = options.Duration or 5
     local theme = THEMES[options.Theme or "Scene"] or THEMES.Scene
     local soundId = options.SoundId or CONFIG.DefaultSoundId
@@ -85,7 +88,7 @@ function NotificationUI:Notify(options)
     local slideTime = options.SlideTime or CONFIG.SlideTime
 
     -- Calculate position
-    local yOffset = position == "BottomRight" and (1 - (activeNotifications * 0.15)) or (0 + (activeNotifications * 0.15))
+    local yOffset = position == "BottomRight" and (1 - (activeNotifications * 0.15)) or (activeNotifications * 0.15)
     local startPos = position == "BottomRight" and UDim2.new(1, 20, 1, -120) or UDim2.new(1, 20, 0, 20 + (activeNotifications * 120))
     local endPos = position == "BottomRight" and UDim2.new(1, -320, 1, -120) or UDim2.new(1, -320, 0, 20 + (activeNotifications * 120))
 
@@ -97,18 +100,18 @@ function NotificationUI:Notify(options)
     notificationFrame.BorderSizePixel = 0
     notificationFrame.ClipsDescendants = true
     notificationFrame.Parent = screenGui
+    print("Notification frame created")
 
     -- Rounded corners
     local uiCorner = Instance.new("UICorner")
     uiCorner.CornerRadius = CONFIG.CornerRadius
     uiCorner.Parent = notificationFrame
 
-    -- Gradient for Scene or Rainbow theme
+    -- Gradient
     if theme.Gradient then
         local uiGradient = Instance.new("UIGradient")
         uiGradient.Parent = notificationFrame
         if theme.Gradient == "Rainbow" then
-            -- Rainbow animation
             uiGradient.Color = ColorSequence.new({
                 ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
                 ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 255, 0)),
@@ -119,8 +122,8 @@ function NotificationUI:Notify(options)
             })
             local tween = TweenService:Create(uiGradient, TweenInfo.new(2, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1), {Rotation = 360})
             tween:Play()
+            print("Rainbow gradient applied")
         else
-            -- Scene gradient
             uiGradient.Color = ColorSequence.new(theme.BackgroundColor, Color3.fromRGB(theme.BackgroundColor.R * 255 * 0.7, theme.BackgroundColor.G * 255 * 0.7, theme.BackgroundColor.B * 255 * 0.7))
         end
     end
@@ -144,11 +147,12 @@ function NotificationUI:Notify(options)
     descLabel.BackgroundTransparency = 1
     descLabel.Text = description
     descLabel.TextColor3 = theme.TextColor
-    descLabel.Font = theme.Font == Enum.Font.GothamBold and Enum.Font.Gotham or theme.Font
+    descLabel.Font = theme.Font
     descLabel.TextSize = 14
     descLabel.TextXAlignment = Enum.TextXAlignment.Left
     descLabel.TextWrapped = true
     descLabel.Parent = notificationFrame
+    print("Labels created")
 
     -- Progress bar
     local progressBar = Instance.new("Frame")
@@ -158,26 +162,35 @@ function NotificationUI:Notify(options)
     progressBar.BorderSizePixel = 0
     progressBar.Parent = notificationFrame
 
-    -- Wave effect for Ocean theme
+    -- Wave effect for Ocean
     if theme.WaveEffect then
         local waveTween = TweenService:Create(progressBar, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Position = UDim2.new(0, 0, 1, -8)})
         waveTween:Play()
+        print("Ocean wave effect applied")
     end
 
-    -- Star effect for Space theme
+    -- Star effect for Space
     if theme.StarEffect then
         local flickerTween = TweenService:Create(notificationFrame, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), {BackgroundTransparency = 0.3})
         flickerTween:Play()
+        print("Space star effect applied")
     end
 
     -- Play sound
     if soundId then
-        local sound = Instance.new("Sound")
-        sound.SoundId = soundId
-        sound.Volume = 0.5
-        sound.Parent = SoundService
-        sound:Play()
-        game.Debris:AddItem(sound, 5)
+        local success, err = pcall(function()
+            local sound = Instance.new("Sound")
+            sound.SoundId = soundId
+            sound.Volume = 0.5
+            sound.Parent = SoundService
+            sound:Play()
+            game.Debris:AddItem(sound, 5)
+        end)
+        if not success then
+            print("Sound failed to play: " .. tostring(err))
+        else
+            print("Sound played: " .. soundId)
+        end
     end
 
     -- Animations
@@ -192,13 +205,14 @@ function NotificationUI:Notify(options)
     -- Initial states
     notificationFrame.BackgroundTransparency = 1
     titleLabel.TextTransparency = 1
-    desc SlovenskoLabel.TextTransparency = 1
+    descLabel.TextTransparency = 1
 
     -- Play animations
     slideIn:Play()
     fadeIn:Play()
     fadeInTitle:Play()
     fadeInDesc:Play()
+    print("Animations started")
 
     -- Increment active notifications
     activeNotifications = activeNotifications + 1
@@ -211,7 +225,7 @@ function NotificationUI:Notify(options)
     clickButton.Text = ""
     clickButton.Parent = notificationFrame
 
-    -- Auto-dismiss or click-to-dismiss
+    -- Dismiss function
     local dismissed = false
     local function dismiss()
         if dismissed then return end
@@ -231,10 +245,51 @@ function NotificationUI:Notify(options)
             notificationFrame:Destroy()
             activeNotifications = activeNotifications - 1
             _G.activeNotifications = activeNotifications
-            -- Update positions
             for i, frame in ipairs(notificationQueue) do
                 if frame and frame.Parent then
-                    local yPos = position == "BottomRight" and (1 - ((i - 1) * 0.15)) or (0 + ((i - 1) * 0.15))
+                    local yPos = position == "BottomRight" and (1 - ((i - 1) * 0.15)) or ((i - 1) * 0.15)
+                    local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                        Position = position == "BottomRight" and UDim2.new(1, -320, 1, -120 - ((i - 1) * 120)) or UDim2.new(1, -320, 0, 20 + ((i - 1) * 120))
+                    })
+                    tween:Play()
+                end
+            end
+            for i = #notificationQueue, 1, -1 do
+                if not notificationQueue[i].Parent then
+                    table.remove(notificationQueue, i)
+                end
+            end
+            print("Notification dismissed")
+        end)
+    end
+
+    clickButton.MouseButton1Click:Connect(dismiss)
+    scaleProgress:Play()
+    scaleProgress.Completed:Connect(dismiss)
+
+    -- Add to queue
+    table.insert(notificationQueue, notificationFrame)
+    print("Notification added to queue")
+
+    -- Enforce max notifications
+    if activeNotifications > CONFIG.MaxNotifications then
+        local oldest = table.remove(notificationQueue, 1)
+        if oldest and oldest.Parent then
+            oldest:Destroy()
+            activeNotifications = activeNotifications - 1
+            _G.activeNotifications = activeNotifications
+            print("Removed oldest notification")
+        end
+    end
+end
+
+-- Expose globally
+_G.Notify = NotificationUI.Notify
+print("NotificationUI loaded successfully")
+
+-- Test notification
+NotificationUI:Notify({Title = "Test", Description = "Debug notification!", Theme = "Scene"})
+return NotificationUI- 1) * 0.15)) or (0 + ((i - 1) * 0.15))
                     local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                         Position = position == "BottomRight" and UDim2.new(1, -320, 1, -120 - ((i - 1) * 120)) or UDim2.new(1, -320, 0, 20 + ((i - 1) * 120))
                     })
