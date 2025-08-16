@@ -1,4 +1,4 @@
--- NeptuneUI Library
+-- NeptuneUI Library (Enhanced)
 local NeptuneUI = {}
 NeptuneUI.__index = NeptuneUI
 
@@ -13,32 +13,107 @@ function NeptuneUI:New(ScreenGuiName)
     self.ScreenGui.Name = ScreenGuiName or "NeptuneUI"
     self.ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     self.ScreenGui.ResetOnSpawn = false
+    self.ScreenGui.IgnoreGuiInset = true
+    self.Windows = {}
+    self.IsVisible = true
+
+    -- Toggle Button (Show/Hide UI)
+    self.ToggleButton = Instance.new("TextButton")
+    self.ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+    self.ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+    self.ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    self.ToggleButton.Text = "≡"
+    self.ToggleButton.TextColor3 = Color3.fromRGB(0, 170, 255)
+    self.ToggleButton.TextSize = 20
+    self.ToggleButton.Font = Enum.Font.SourceSansBold
+    self.ToggleButton.Parent = self.ScreenGui
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 12)
+    Corner.Parent = self.ToggleButton
+
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(0, 170, 255)
+    Stroke.Thickness = 1
+    Stroke.Transparency = 0.5
+    Stroke.Parent = self.ToggleButton
+
+    -- Toggle UI visibility
+    self.ToggleButton.MouseButton1Click:Connect(function()
+        self:ToggleVisibility()
+    end)
+
     return self
 end
 
--- Create a draggable window
+-- Toggle UI visibility with animation
+function NeptuneUI:ToggleVisibility()
+    self.IsVisible = not self.IsVisible
+    for _, window in ipairs(self.Windows) do
+        local targetTransparency = self.IsVisible and 0 or 1
+        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(window.Frame, tweenInfo, {BackgroundTransparency = targetTransparency})
+        tween:Play()
+        for _, element in ipairs(window.Elements) do
+            local textTransparency = self.IsVisible and 0 or 1
+            local bgTransparency = self.IsVisible and (element:IsA("TextButton") and 0.2 or 0) or 1
+            TweenService:Create(element, tweenInfo, {BackgroundTransparency = bgTransparency, TextTransparency = textTransparency}):Play()
+        end
+    end
+end
+
+-- Create a draggable window with modern design
 function NeptuneUI:CreateWindow(Title, Size, Position)
     local Window = {}
     Window.Frame = Instance.new("Frame")
-    Window.Frame.Size = Size or UDim2.new(0, 300, 0, 400)
-    Window.Frame.Position = Position or UDim2.new(0.5, -150, 0.5, -200)
-    Window.Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Window.Frame.Size = Size or UDim2.new(0, 350, 0, 450)
+    Window.Frame.Position = Position or UDim2.new(0.5, -175, 0.5, -225)
+    Window.Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    Window.Frame.BackgroundTransparency = 0.1
     Window.Frame.BorderSizePixel = 0
     Window.Frame.Parent = self.ScreenGui
 
+    -- Glassmorphism effect
+    local Gradient = Instance.new("UIGradient")
+    Gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
+    }
+    Gradient.Rotation = 45
+    Gradient.Parent = Window.Frame
+
     local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.CornerRadius = UDim.new(0, 12)
     Corner.Parent = Window.Frame
 
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(0, 170, 255)
+    Stroke.Thickness = 1
+    Stroke.Transparency = 0.5
+    Stroke.Parent = Window.Frame
+
+    -- Title Bar
+    local TitleBar = Instance.new("Frame")
+    TitleBar.Size = UDim2.new(1, 0, 0, 40)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    TitleBar.BackgroundTransparency = 0.3
+    TitleBar.BorderSizePixel = 0
+    TitleBar.Parent = Window.Frame
+
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 12)
+    TitleCorner.Parent = TitleBar
+
     local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(1, 0, 0, 30)
-    TitleLabel.Position = UDim2.new(0, 0, 0, 0)
+    TitleLabel.Size = UDim2.new(1, -10, 1, 0)
+    TitleLabel.Position = UDim2.new(0, 10, 0, 0)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = Title or "NeptuneUI Window"
+    TitleLabel.Text = Title or "NeptuneUI"
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleLabel.TextSize = 16
+    TitleLabel.TextSize = 18
     TitleLabel.Font = Enum.Font.SourceSansBold
-    TitleLabel.Parent = Window.Frame
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = TitleBar
 
     -- Dragging functionality
     local dragging, dragInput, dragStart, startPos
@@ -47,7 +122,7 @@ function NeptuneUI:CreateWindow(Title, Size, Position)
         Window.Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 
-    Window.Frame.InputBegan:Connect(function(input)
+    TitleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
@@ -60,7 +135,7 @@ function NeptuneUI:CreateWindow(Title, Size, Position)
         end
     end)
 
-    Window.Frame.InputChanged:Connect(function(input)
+    TitleBar.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement then
             dragInput = input
         end
@@ -73,23 +148,38 @@ function NeptuneUI:CreateWindow(Title, Size, Position)
     end)
 
     Window.Elements = {}
-    Window.NextPosition = UDim2.new(0, 10, 0, 40) -- For stacking elements vertically
+    Window.NextPosition = UDim2.new(0, 15, 0, 50)
 
     -- Methods for adding elements to the window
     function Window:AddButton(Text, Callback)
         local Button = Instance.new("TextButton")
-        Button.Size = UDim2.new(1, -20, 0, 30)
+        Button.Size = UDim2.new(1, -30, 0, 40)
         Button.Position = Window.NextPosition
-        Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        Button.BackgroundTransparency = 0.2
         Button.Text = Text or "Button"
         Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Button.TextSize = 14
-        Button.Font = Enum.Font.SourceSans
+        Button.TextSize = 16
+        Button.Font = Enum.Font.SourceSansBold
         Button.Parent = Window.Frame
 
         local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.CornerRadius = UDim.new(0, 8)
         Corner.Parent = Button
+
+        local Stroke = Instance.new("UIStroke")
+        Stroke.Color = Color3.fromRGB(255, 255, 255)
+        Stroke.Thickness = 1
+        Stroke.Transparency = 0.7
+        Stroke.Parent = Button
+
+        -- Hover animation
+        Button.MouseEnter:Connect(function()
+            TweenService:Create(Button, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {BackgroundTransparency = 0}):Play()
+        end)
+        Button.MouseLeave:Connect(function()
+            TweenService:Create(Button, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {BackgroundTransparency = 0.2}):Play()
+        end)
 
         Button.MouseButton1Click:Connect(function()
             if Callback then
@@ -97,84 +187,109 @@ function NeptuneUI:CreateWindow(Title, Size, Position)
             end
         end)
 
-        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 40)
+        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 50)
         table.insert(Window.Elements, Button)
     end
 
     function Window:AddLabel(Text)
         local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(1, -20, 0, 20)
+        Label.Size = UDim2.new(1, -30, 0, 30)
         Label.Position = Window.NextPosition
         Label.BackgroundTransparency = 1
         Label.Text = Text or "Label"
         Label.TextColor3 = Color3.fromRGB(200, 200, 200)
-        Label.TextSize = 14
+        Label.TextSize = 16
         Label.Font = Enum.Font.SourceSans
+        Label.TextXAlignment = Enum.TextXAlignment.Left
         Label.Parent = Window.Frame
 
-        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 30)
+        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 40)
         table.insert(Window.Elements, Label)
     end
 
     function Window:AddToggle(Text, Default, Callback)
         local Toggle = Instance.new("TextButton")
-        Toggle.Size = UDim2.new(1, -20, 0, 30)
+        Toggle.Size = UDim2.new(1, -30, 0, 40)
         Toggle.Position = Window.NextPosition
-        Toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        Toggle.BackgroundColor3 = Default and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 50)
+        Toggle.BackgroundTransparency = 0.2
         Toggle.Text = Text or "Toggle: " .. (Default and "On" or "Off")
         Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Toggle.TextSize = 14
-        Toggle.Font = Enum.Font.SourceSans
+        Toggle.TextSize = 16
+        Toggle.Font = Enum.Font.SourceSansBold
         Toggle.Parent = Window.Frame
 
         local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.CornerRadius = UDim.new(0, 8)
         Corner.Parent = Toggle
+
+        local Stroke = Instance.new("UIStroke")
+        Stroke.Color = Color3.fromRGB(255, 255, 255)
+        Stroke.Thickness = 1
+        Stroke.Transparency = 0.7
+        Stroke.Parent = Toggle
 
         local State = Default or false
         Toggle.MouseButton1Click:Connect(function()
             State = not State
             Toggle.Text = Text or "Toggle: " .. (State and "On" or "Off")
-            Toggle.BackgroundColor3 = State and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(50, 50, 50)
+            local targetColor = State and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 50)
+            TweenService:Create(Toggle, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {BackgroundColor3 = targetColor, BackgroundTransparency = 0.2}):Play()
             if Callback then
                 Callback(State)
             end
         end)
 
-        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 40)
+        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 50)
         table.insert(Window.Elements, Toggle)
     end
 
+    table.insert(self.Windows, Window)
     return Window
 end
 
--- Notify function (similar to your example)
+-- Notify function with modern animation
 function NeptuneUI:Notify(Text, Duration)
     local Notification = Instance.new("Frame")
-    Notification.Size = UDim2.new(0, 200, 0, 50)
-    Notification.Position = UDim2.new(1, -210, 1, -60)
-    Notification.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Notification.Size = UDim2.new(0, 250, 0, 60)
+    Notification.Position = UDim2.new(1, 260, 1, -70)
+    Notification.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    Notification.BackgroundTransparency = 0.1
     Notification.BorderSizePixel = 0
     Notification.Parent = self.ScreenGui
 
     local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.CornerRadius = UDim.new(0, 10)
     Corner.Parent = Notification
 
+    local Stroke = Instance.new("UIStroke")
+    Stroke.Color = Color3.fromRGB(0, 170, 255)
+    Stroke.Thickness = 1
+    Stroke.Transparency = 0.5
+    Stroke.Parent = Notification
+
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, 0, 1, 0)
+    Label.Size = UDim2.new(1, -10, 1, 0)
+    Label.Position = UDim2.new(0, 5, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = Text or "Notification"
     Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Label.TextSize = 14
+    Label.TextSize = 16
     Label.Font = Enum.Font.SourceSans
+    Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Notification
 
+    -- Slide-in animation
+    local tweenIn = TweenService:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1, -260, 1, -70)})
+    tweenIn:Play()
+    tweenIn.Completed:Wait()
+
+    -- Slide-out animation after duration
     spawn(function()
         wait(Duration or 3)
-        local tween = TweenService:Create(Notification, TweenInfo.new(0.5), {Position = UDim2.new(1, 0, 1, -60)})
-        tween:Play()
-        tween.Completed:Wait()
+        local tweenOut = TweenService:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1, 260, 1, -70)})
+        tweenOut:Play()
+        tweenOut.Completed:Wait()
         Notification:Destroy()
     end)
 end
