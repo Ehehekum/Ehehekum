@@ -1,0 +1,170 @@
+-- Neptune-inspired Notification UI for Roblox
+local NotificationUI = {}
+
+-- Services
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+
+-- Configuration
+local CONFIG = {
+    Duration = 5, -- Notification duration (seconds)
+    FadeTime = 0.5, -- Fade animation time
+    SlideTime = 0.7, -- Slide animation time
+    BackgroundColor = Color3.fromRGB(30, 30, 30), -- Dark background
+    TextColor = Color3.fromRGB(255, 255, 255), -- White text
+    AccentColor = Color3.fromRGB(0, 170, 255), -- Blue progress bar
+    Font = Enum.Font.GothamBold, -- Title font
+    CornerRadius = UDim.new(0, 10), -- Rounded corners
+    MaxNotifications = 5, -- Max concurrent notifications
+}
+
+-- Local player and GUI
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local screenGui = playerGui:FindFirstChild("NotificationGui") or Instance.new("ScreenGui")
+screenGui.Name = "NotificationGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Notification queue
+local notificationQueue = _G.notificationQueue or {}
+_G.notificationQueue = notificationQueue
+local activeNotifications = _G.activeNotifications or 0
+_G.activeNotifications = activeNotifications
+
+-- Create a notification
+function NotificationUI:Notify(title, description)
+    title = title or "Notification"
+    description = description or "This is a default notification."
+
+    -- Create notification frame
+    local notificationFrame = Instance.new("Frame")
+    notificationFrame.Size = UDim2.new(0, 300, 0, 100)
+    notificationFrame.Position = UDim2.new(1, 20, 0, 20 + (activeNotifications * 120))
+    notificationFrame.BackgroundColor3 = CONFIG.BackgroundColor
+    notificationFrame.BorderSizePixel = 0
+    notificationFrame.ClipsDescendants = true
+    notificationFrame.Parent = screenGui
+
+    -- Rounded corners
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = CONFIG.CornerRadius
+    uiCorner.Parent = notificationFrame
+
+    -- Title label
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0.9, 0, 0, 30)
+    titleLabel.Position = UDim2.new(0.05, 0, 0, 10)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = CONFIG.TextColor
+    titleLabel.Font = CONFIG.Font
+    titleLabel.TextSize = 18
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = notificationFrame
+
+    -- Description label
+    local descLabel = Instance.new("TextLabel")
+    descLabel.Size = UDim2.new(0.9, 0, 0, 40)
+    descLabel.Position = UDim2.new(0.05, 0, 0, 40)
+    descLabel.BackgroundTransparency = 1
+    descLabel.Text = description
+    descLabel.TextColor3 = CONFIG.TextColor
+    descLabel.Font = Enum.Font.Gotham
+    descLabel.TextSize = 14
+    descLabel.TextXAlignment = Enum.TextXAlignment.Left
+    descLabel.TextWrapped = true
+    descLabel.Parent = notificationFrame
+
+    -- Progress bar
+    local progressBar = Instance.new("Frame")
+    progressBar.Size = UDim2.new(1, 0, 0, 4)
+    progressBar.Position = UDim2.new(0, 0, 1, -4)
+    progressBar.BackgroundColor3 = CONFIG.AccentColor
+    progressBar.BorderSizePixel = 0
+    progressBar.Parent = notificationFrame
+
+    -- Animations
+    local tweenInfo = TweenInfo.new(CONFIG.SlideTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local fadeInInfo = TweenInfo.new(CONFIG.FadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+    local slideIn = TweenService:Create(notificationFrame, tweenInfo, {
+        Position = UDim2.new(1, -320, 0, notificationFrame.Position.Y.Offset)
+    })
+    local fadeIn = TweenService:Create(notificationFrame, fadeInInfo, {BackgroundTransparency = 0.1})
+    local fadeInTitle = TweenService:Create(titleLabel, fadeInInfo, {TextTransparency = 0})
+    local fadeInDesc = TweenService:Create(descLabel, fadeInInfo, {TextTransparency = 0})
+    local scaleProgress = TweenService:Create(progressBar, TweenInfo.new(CONFIG.Duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 4)})
+
+    -- Initial states
+    notificationFrame.BackgroundTransparency = 1
+    titleLabel.TextTransparency = 1
+    descLabel.TextTransparency = 1
+    notificationFrame.Position = UDim2.new(1, 20, 0, notificationFrame.Position.Y.Offset)
+
+    -- Play animations
+    slideIn:Play()
+    fadeIn:Play()
+    fadeInTitle:Play()
+    fadeInDesc:Play()
+
+    -- Increment active notifications
+    activeNotifications = activeNotifications + 1
+    _G.activeNotifications = activeNotifications
+
+    -- Auto-dismiss
+    scaleProgress:Play()
+    scaleProgress.Completed:Connect(function()
+        local fadeOutInfo = TweenInfo.new(CONFIG.FadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
+        local fadeOut = TweenService:Create(notificationFrame, fadeOutInfo, {BackgroundTransparency = 1})
+        local fadeOutTitle = TweenService:Create(titleLabel, fadeOutInfo, {TextTransparency = 1})
+        local fadeOutDesc = TweenService:Create(descLabel, fadeOutInfo, {TextTransparency = 1})
+        local slideOut = TweenService:Create(notificationFrame, tweenInfo, {
+            Position = UDim2.new(1, 20, 0, notificationFrame.Position.Y.Offset)
+        })
+
+        fadeOut:Play()
+        fadeOutTitle:Play()
+        fadeOutDesc:Play()
+        slideOut:Play()
+
+        slideOut.Completed:Connect(function()
+            notificationFrame:Destroy()
+            activeNotifications = activeNotifications - 1
+            _G.activeNotifications = activeNotifications
+            -- Update positions
+            for i, frame in ipairs(notificationQueue) do
+                if frame and frame.Parent then
+                    local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+                        Position = UDim2.new(1, -320, 0, 20 + ((i - 1) * 120))
+                    })
+                    tween:Play()
+                end
+            end
+            -- Clean queue
+            for i = #notificationQueue, 1, -1 do
+                if not notificationQueue[i].Parent then
+                    table.remove(notificationQueue, i)
+                end
+            end
+        end)
+    end)
+
+    -- Add to queue
+    table.insert(notificationQueue, notificationFrame)
+
+    -- Enforce max notifications
+    if activeNotifications > CONFIG.MaxNotifications then
+        local oldest = table.remove(notificationQueue, 1)
+        if oldest and oldest.Parent then
+            oldest:Destroy()
+            activeNotifications = activeNotifications - 1
+            _G.activeNotifications = activeNotifications
+        end
+    end
+end
+
+-- Expose globally
+_G.Notify = NotificationUI.Notify
+
+-- Return the table for library-style usage
+return NotificationUI
