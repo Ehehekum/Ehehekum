@@ -1,253 +1,127 @@
--- AstraUI Library
-local AstraUI = {}
-AstraUI.__index = AstraUI
-
--- Services
-local UserInputService = game:GetService("UserInputService")
+-- ThreeDUILibrary.lua
+local ThreeDUILibrary = {}
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 
--- Create a new UI library instance
-function AstraUI:New(ScreenGuiName)
-    local self = setmetatable({}, AstraUI)
-    self.ScreenGui = Instance.new("ScreenGui")
-    self.ScreenGui.Name = ScreenGuiName or "AstraUI"
-    self.ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-    self.ScreenGui.ResetOnSpawn = false
-    self.ScreenGui.IgnoreGuiInset = true
-    self.Windows = {}
-    self.IsVisible = true
+local TWEEN_INFO = TweenInfo.new(
+    0.3, -- Duration
+    Enum.EasingStyle.Sine,
+    Enum.EasingDirection.InOut,
+    0,
+    false,
+    0
+)
 
-    -- Toggle Button (Show/Hide UI)
-    self.ToggleButton = Instance.new("TextButton")
-    self.ToggleButton.Size = UDim2.new(0, 60, 0, 60)
-    self.ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-    self.ToggleButton.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-    self.ToggleButton.BackgroundTransparency = 0.1
-    self.ToggleButton.Text = "🌌"
-    self.ToggleButton.TextColor3 = Color3.fromRGB(0, 255, 255)
-    self.ToggleButton.TextSize = 24
-    self.ToggleButton.Font = Enum.Font.Arcade
-    self.ToggleButton.Parent = self.ScreenGui
+function ThreeDUILibrary.CreateButton(parent, text, position, size)
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = size or UDim2.new(0, 150, 0, 50)
+    buttonFrame.Position = position or UDim2.new(0.5, -75, 0.5, -25)
+    buttonFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    buttonFrame.BorderSizePixel = 0
+    buttonFrame.Parent = parent
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 15)
-    Corner.Parent = self.ToggleButton
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 100, 100)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 30))
+    })
+    gradient.Rotation = 45
+    gradient.Parent = buttonFrame
 
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(0, 255, 255)
-    Stroke.Thickness = 2
-    Stroke.Transparency = 0.2
-    Stroke.Parent = self.ToggleButton
+    local shadow = Instance.new("ImageLabel")
+    shadow.Size = UDim2.new(1, 10, 1, 10)
+    shadow.Position = UDim2.new(0, 5, 0, 5)
+    shadow.BackgroundTransparency = 1
+    shadow.Image = "rbxassetid://131604521"
+    shadow.ImageTransparency = 0.5
+    shadow.Parent = buttonFrame
 
-    -- Neon glow effect
-    local Glow = Instance.new("UIGradient")
-    Glow.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 200, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 255))
-    }
-    Glow.Rotation = 45
-    Glow.Parent = Stroke
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = text or "Button"
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.Parent = buttonFrame
 
-    -- Toggle button animations
-    self.ToggleButton.MouseEnter:Connect(function()
-        TweenService:Create(self.ToggleButton, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {BackgroundTransparency = 0, TextSize = 26}):Play()
-        TweenService:Create(Stroke, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {Transparency = 0}):Play()
-    end)
-    self.ToggleButton.MouseLeave:Connect(function()
-        TweenService:Create(self.ToggleButton, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.1, TextSize = 24}):Play()
-        TweenService:Create(Stroke, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {Transparency = 0.2}):Play()
-    end)
-
-    self.ToggleButton.MouseButton1Click:Connect(function()
-        self:ToggleVisibility()
-    end)
-
-    return self
-end
-
--- Toggle UI visibility with fade animation
-function AstraUI:ToggleVisibility()
-    self.IsVisible = not self.IsVisible
-    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-    for _, window in ipairs(self.Windows) do
-        local targetTransparency = self.IsVisible and 0.05 or 1
-        TweenService:Create(window.Frame, tweenInfo, {BackgroundTransparency = targetTransparency}):Play()
-        for _, element in ipairs(window.Elements) do
-            local textTransparency = self.IsVisible and 0 or 1
-            local bgTransparency = self.IsVisible and (element:IsA("TextButton") or element:IsA("Frame") or element:IsA("TextBox") and 0.2 or 0) or 1
-            TweenService:Create(element, tweenInfo, {BackgroundTransparency = bgTransparency, TextTransparency = textTransparency}):Play()
-        end
-        for _, tab in ipairs(window.Tabs or {}) do
-            for _, tabElement in ipairs(tab.Elements) do
-                local textTransparency = self.IsVisible and 0 or 1
-                local bgTransparency = self.IsVisible and (tabElement:IsA("TextButton") or tabElement:IsA("Frame") or tabElement:IsA("TextBox") and 0.2 or 0) or 1
-                TweenService:Create(tabElement, tweenInfo, {BackgroundTransparency = bgTransparency, TextTransparency = textTransparency}):Play()
-            end
-        end
-    end
-end
-
--- Create a draggable window with cyberpunk design
-function AstraUI:CreateWindow(Title, Size, Position)
-    local Window = {}
-    Window.Frame = Instance.new("Frame")
-    Window.Frame.Size = Size or UDim2.new(0, 450, 0, 550)
-    Window.Frame.Position = Position or UDim2.new(0.5, -225, 0.5, -275)
-    Window.Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-    Window.Frame.BackgroundTransparency = 0.05
-    Window.Frame.BorderSizePixel = 0
-    Window.Frame.Parent = self.ScreenGui
-
-    -- Cyberpunk gradient
-    local Gradient = Instance.new("UIGradient")
-    Gradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 25, 30)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 15))
-    }
-    Gradient.Rotation = 45
-    Gradient.Parent = Window.Frame
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 15)
-    Corner.Parent = Window.Frame
-
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(0, 255, 255)
-    Stroke.Thickness = 2
-    Stroke.Transparency = 0.2
-    Stroke.Parent = Window.Frame
-
-    -- Title Bar
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 50)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-    TitleBar.BackgroundTransparency = 0.3
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = Window.Frame
-
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 15)
-    TitleCorner.Parent = TitleBar
-
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(1, -20, 1, 0)
-    TitleLabel.Position = UDim2.new(0, 20, 0, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = Title or "AstraUI"
-    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleLabel.TextSize = 22
-    TitleLabel.Font = Enum.Font.Arcade
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = TitleBar
-
-    -- Dragging functionality
-    local dragging, dragInput, dragStart, startPos
-    local function updateInput(input)
-        local delta = input.Position - dragStart
-        Window.Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    local function hoverEffect()
+        local tween = TweenService:Create(
+            buttonFrame,
+            TWEEN_INFO,
+            {UIScale = 1.1, BackgroundColor3 = Color3.fromRGB(70, 70, 70)}
+        )
+        tween:Play()
     end
 
-    TitleBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = Window.Frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
+    local function unhoverEffect()
+        local tween = TweenService:Create(
+            buttonFrame,
+            TWEEN_INFO,
+            {UIScale = 1, BackgroundColor3 = Color3.fromRGB(50, 50, 50)}
+        )
+        tween:Play()
+    end
 
-    TitleBar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            updateInput(input)
-        end
-    end)
-
-    Window.Elements = {}
-    Window.Tabs = {}
-    Window.NextPosition = UDim2.new(0, 20, 0, 100) -- Adjusted for tab bar
-    Window.TabBar = Instance.new("Frame")
-    Window.TabBar.Size = UDim2.new(1, 0, 0, 40)
-    Window.TabBar.Position = UDim2.new(0, 0, 0, 50)
-    Window.TabBar.BackgroundTransparency = 1
-    Window.TabBar.Parent = Window.Frame
-
-    local TabList = Instance.new("UIListLayout")
-    TabList.FillDirection = Enum.FillDirection.Horizontal
-    TabList.SortOrder = Enum.SortOrder.LayoutOrder
-    TabList.Padding = UDim.new(0, 5)
-    TabList.Parent = Window.TabBar
-
-    table.insert(self.Windows, Window)
-
-    -- Tab management
-    function Window:AddTab(TabName)
-        local Tab = {}
-        Tab.Elements = {}
-        Tab.Frame = Instance.new("Frame")
-        Tab.Frame.Size = UDim2.new(1, -40, 1, -100)
-        Tab.Frame.Position = UDim2.new(0, 20, 0, 100)
-        Tab.Frame.BackgroundTransparency = 1
-        Tab.Frame.Visible = false
-        Tab.Frame.Parent = Window.Frame
-
-        local TabButton = Instance.new("TextButton")
-        TabButton.Size = UDim2.new(0, 100, 0, 30)
-        TabButton.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-        TabButton.BackgroundTransparency = 0.3
-        TabButton.Text = TabName or "Tab"
-        TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        TabButton.TextSize = 16
-        TabButton.Font = Enum.Font.Arcade
-        TabButton.Parent = Window.TabBar
-
-        local TabCorner = Instance.new("UICorner")
-        TabCorner.CornerRadius = UDim.new(0, 8)
-        TabCorner.Parent = TabButton
-
-        local TabStroke = Instance.new("UIStroke")
-        TabStroke.Color = Color3.fromRGB(0, 255, 255)
-        TabStroke.Thickness = 1.5
-        TabStroke.Transparency = 0.5
-        TabStroke.Parent = TabButton
-
-        -- Tab selection
-        TabButton.MouseButton1Click:Connect(function()
-            for _, otherTab in ipairs(Window.Tabs) do
-                otherTab.Frame.Visible = false
-                TweenService:Create(otherTab.Button, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.3}):Play()
-            end
-            Tab.Frame.Visible = true
-            TweenService:Create(TabButton, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {BackgroundTransparency = 0}):Play()
+    local function clickEffect()
+        local tween = TweenService:Create(
+            buttonFrame,
+            TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {UIScale = 0.95}
+        )
+        tween:Play()
+        tween.Completed:Connect(function()
+            TweenService:Create(
+                buttonFrame,
+                TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {UIScale = 1}
+            ):Play()
         end)
+    end
 
-        Tab.Button = TabButton
-        Tab.NextPosition = UDim2.new(0, 0, 0, 0)
-        table.insert(Window.Tabs, Tab)
+    buttonFrame.MouseEnter:Connect(hoverEffect)
+    buttonFrame.MouseLeave:Connect(unhoverEffect)
+    buttonFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            clickEffect()
+        end
+    end)
 
-        -- Add elements to tab
-        function Tab:AddButton(Text, Callback)
-            local Button = Instance.new("TextButton")
-            Button.Size = UDim2.new(1, 0, 0, 45)
-            Button.Position = Tab.NextPosition
-            Button.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-            Button.BackgroundTransparency = 0.2
-            Button.Text = Text or "Button"
-            Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-            Button.TextSize = 18
-            Button.Font = Enum.Font.Arcade
-            Button.Parent = Tab.Frame
+    return buttonFrame
+end
+
+function ThreeDUILibrary.CreatePanel(parent, position, size)
+    local panelFrame = Instance.new("Frame")
+    panelFrame.Size = size or UDim2.new(0, 300, 0, 200)
+    panelFrame.Position = position or UDim2.new(0.5, -150, 1, 0)
+    panelFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    panelFrame.BorderSizePixel = 0
+    panelFrame.Parent = parent
+
+    local border = Instance.new("Frame")
+    border.Size = UDim2.new(1, 10, 1, 10)
+    border.Position = UDim2.new(0, -5, 0, -5)
+    border.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    border.ZIndex = -1
+    border.Parent = panelFrame
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 80, 80)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    })
+    gradient.Parent = panelFrame
+
+    local tween = TweenService:Create(
+        panelFrame,
+        TWEEN_INFO,
+        {Position = UDim2.new(0.5, -150, 0.5, -100)}
+    )
+    tween:Play()
+
+    return panelFrame
+end
+
+return ThreeDUILibrary          Button.Parent = Tab.Frame
 
             local Corner = Instance.new("UICorner")
             Corner.CornerRadius = UDim.new(0, 10)
