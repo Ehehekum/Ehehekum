@@ -1,246 +1,249 @@
-local CleanUI = {}
+-- KeySystemLibrary (Loadstring-Compatible)
+local KeySystemLibrary = {}
+KeySystemLibrary.__index = KeySystemLibrary
+
+-- Services
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 
--- Core UI Setup
-function CleanUI:CreateWindow(config)
-    local windowConfig = {
-        Title = config.Title or "CleanUI",
-        Subtitle = config.Subtitle or "v1.0",
-        PrimaryColor = config.PrimaryColor or Color3.fromRGB(30, 144, 255),
-        GradientEnabled = config.GradientEnabled or true
-    }
+-- Default Configuration
+local DefaultConfig = {
+    Size = UDim2.new(0, 400, 0, 250),
+    BackgroundColor = Color3.fromRGB(30, 30, 30),
+    TitleText = "Key System",
+    TitleColor = Color3.fromRGB(255, 255, 255),
+    TitleFont = Enum.Font.GothamBold,
+    TitleSize = 24,
+    InputPlaceholder = "Enter your key here...",
+    InputBackground = Color3.fromRGB(40, 40, 40),
+    InputTextColor = Color3.fromRGB(200, 200, 200),
+    InputFont = Enum.Font.Gotham,
+    InputSize = 16,
+    ButtonText = "Submit",
+    ButtonBackground = Color3.fromRGB(0, 120, 255),
+    ButtonHoverColor = Color3.fromRGB(0, 150, 255),
+    ButtonTextColor = Color3.fromRGB(255, 255, 255),
+    ButtonFont = Enum.Font.GothamBold,
+    ButtonTextSize = 18,
+    CornerRadius = 12,
+    SuccessSoundId = "rbxassetid://9119747931",
+    ErrorSoundId = "rbxassetid://9119747931",
+    AnimationDuration = 0.5,
+}
 
-    -- ScreenGui
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "CleanUI"
-    ScreenGui.Parent = Players.LocalPlayer.PlayerGui
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-    ScreenGui.ResetOnSpawn = false
-
-    -- Main Frame
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 500, 0, 350)
-    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -175)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Parent = ScreenGui
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 12)
-    UICorner.Parent = MainFrame
-
-    -- Draggable
-    local dragging, dragInput, dragStart, startPos
-    local function update(input)
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+-- Constructor
+function KeySystemLibrary.new(config)
+    local self = setmetatable({}, KeySystemLibrary)
+    self.Config = {}
+    for k, v in pairs(DefaultConfig) do
+        self.Config[k] = config and config[k] or v
     end
-    MainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
+    self:CreateUI()
+    self:SetupAnimations()
+    self:BindEvents()
+    return self
+end
+
+-- Create UI
+function KeySystemLibrary:CreateUI()
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    self.ScreenGui = Instance.new("ScreenGui")
+    self.ScreenGui.Name = "KeySystemGUI"
+    self.ScreenGui.ResetOnSpawn = false
+    self.ScreenGui.Parent = playerGui
+    
+    self.MainFrame = Instance.new("Frame")
+    self.MainFrame.Size = self.Config.Size
+    self.MainFrame.Position = UDim2.new(0.5, -self.Config.Size.X.Offset / 2, 0.5, -self.Config.Size.Y.Offset / 2)
+    self.MainFrame.BackgroundColor3 = self.Config.BackgroundColor
+    self.MainFrame.BorderSizePixel = 0
+    self.MainFrame.ClipsDescendants = true
+    self.MainFrame.Parent = self.ScreenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, self.Config.CornerRadius)
+    corner.Parent = self.MainFrame
+    
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    })
+    gradient.Rotation = 45
+    gradient.Parent = self.MainFrame
+    
+    local shadow = Instance.new("ImageLabel")
+    shadow.Image = "rbxassetid://1316045217"
+    shadow.Size = UDim2.new(1, 20, 1, 20)
+    shadow.Position = UDim2.new(0, -10, 0, -10)
+    shadow.BackgroundTransparency = 1
+    shadow.ImageTransparency = 0.8
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.Parent = self.MainFrame
+    
+    self.Title = Instance.new("TextLabel")
+    self.Title.Size = UDim2.new(1, 0, 0, 50)
+    self.Title.Position = UDim2.new(0, 0, 0, 10)
+    self.Title.BackgroundTransparency = 1
+    self.Title.Text = self.Config.TitleText
+    self.Title.TextColor3 = self.Config.TitleColor
+    self.Title.TextSize = self.Config.TitleSize
+    self.Title.Font = self.Config.TitleFont
+    self.Title.Parent = self.MainFrame
+    
+    self.KeyInput = Instance.new("TextBox")
+    self.KeyInput.Size = UDim2.new(0.9, 0, 0, 40)
+    self.KeyInput.Position = UDim2.new(0.05, 0, 0, 80)
+    self.KeyInput.BackgroundColor3 = self.Config.InputBackground
+    self.KeyInput.Text = ""
+    self.KeyInput.PlaceholderText = self.Config.InputPlaceholder
+    self.KeyInput.TextColor3 = self.Config.InputTextColor
+    self.KeyInput.TextSize = self.Config.InputSize
+    self.KeyInput.Font = self.Config.InputFont
+    self.KeyInput.Parent = self.MainFrame
+    
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, self.Config.CornerRadius - 4)
+    inputCorner.Parent = self.KeyInput
+    
+    self.SubmitButton = Instance.new("TextButton")
+    self.SubmitButton.Size = UDim2.new(0.4, 0, 0, 40)
+    self.SubmitButton.Position = UDim2.new(0.3, 0, 0, 150)
+    self.SubmitButton.BackgroundColor3 = self.Config.ButtonBackground
+    self.SubmitButton.Text = self.Config.ButtonText
+    self.SubmitButton.TextColor3 = self.Config.ButtonTextColor
+    self.SubmitButton.TextSize = self.Config.ButtonTextSize
+    self.SubmitButton.Font = self.Config.ButtonFont
+    self.SubmitButton.Parent = self.MainFrame
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, self.Config.CornerRadius - 4)
+    buttonCorner.Parent = self.SubmitButton
+    
+    self.StatusLabel = Instance.new("TextLabel")
+    self.StatusLabel.Size = UDim2.new(0.9, 0, 0, 30)
+    self.StatusLabel.Position = UDim2.new(0.05, 0, 0, 200)
+    self.StatusLabel.BackgroundTransparency = 1
+    self.StatusLabel.Text = ""
+    self.StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    self.StatusLabel.TextSize = 14
+    self.StatusLabel.Font = self.Config.InputFont
+    self.StatusLabel.Parent = self.MainFrame
+end
+
+-- Setup Animations
+function KeySystemLibrary:SetupAnimations()
+    self.Tweens = {}
+    self.MainFrame.BackgroundTransparency = 1
+    self.Title.TextTransparency = 1
+    self.KeyInput.BackgroundTransparency = 1
+    self.KeyInput.TextTransparency = 1
+    self.SubmitButton.BackgroundTransparency = 1
+    self.SubmitButton.TextTransparency = 1
+    self.StatusLabel.TextTransparency = 1
+    
+    local fadeInInfo = TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    self.Tweens.FadeInFrame = TweenService:Create(self.MainFrame, fadeInInfo, {BackgroundTransparency = 0})
+    self.Tweens.FadeInTitle = TweenService:Create(self.Title, fadeInInfo, {TextTransparency = 0})
+    self.Tweens.FadeInInput = TweenService:Create(self.KeyInput, fadeInInfo, {BackgroundTransparency = 0, TextTransparency = 0})
+    self.Tweens.FadeInButton = TweenService:Create(self.SubmitButton, fadeInInfo, {BackgroundTransparency = 0, TextTransparency = 0})
+    self.Tweens.FadeInStatus = TweenService:Create(self.StatusLabel, fadeInInfo, {TextTransparency = 0})
+    
+    local fadeOutInfo = TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    self.Tweens.FadeOutFrame = TweenService:Create(self.MainFrame, fadeOutInfo, {BackgroundTransparency = 1})
+    self.Tweens.FadeOutTitle = TweenService:Create(self.Title, fadeOutInfo, {TextTransparency = 1})
+    self.Tweens.FadeOutInput = TweenService:Create(self.KeyInput, fadeOutInfo, {BackgroundTransparency = 1, TextTransparency = 1})
+    self.Tweens.FadeOutButton = TweenService:Create(self.SubmitButton, fadeOutInfo, {BackgroundTransparency = 1, TextTransparency = 1})
+    self.Tweens.FadeOutStatus = TweenService:Create(self.StatusLabel, fadeOutInfo, {TextTransparency = 1})
+    
+    local hoverInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    self.Tweens.ButtonHover = TweenService:Create(self.SubmitButton, hoverInfo, {BackgroundColor3 = self.Config.ButtonHoverColor})
+    self.Tweens.ButtonUnhover = TweenService:Create(self.SubmitButton, hoverInfo, {BackgroundColor3 = self.Config.ButtonBackground})
+    
+    self.Tweens.ShakeInput = TweenService:Create(self.KeyInput, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, 2, true), {Position = UDim2.new(0.05, 5, 0, 80)})
+end
+
+-- Bind Events
+function KeySystemLibrary:BindEvents()
+    self.SubmitButton.MouseEnter:Connect(function()
+        self.Tweens.ButtonHover:Play()
+    end)
+    
+    self.SubmitButton.MouseLeave:Connect(function()
+        self.Tweens.ButtonUnhover:Play()
+    end)
+    
+    self.SubmitButton.MouseButton1Click:Connect(function()
+        self:ValidateKey(self.KeyInput.Text)
+    end)
+    
+    self.KeyInput.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            self:ValidateKey(self.KeyInput.Text)
         end
     end)
-    MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            update(input)
-        end
-    end)
+end
 
-    -- Title Bar
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 40)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = MainFrame
-    local TitleUICorner = Instance.new("UICorner")
-    TitleUICorner.CornerRadius = UDim.new(0, 12)
-    TitleUICorner.Parent = TitleBar
+-- Show GUI
+function KeySystemLibrary:Show()
+    self.Tweens.FadeInFrame:Play()
+    self.Tweens.FadeInTitle:Play()
+    self.Tweens.FadeInInput:Play()
+    self.Tweens.FadeInButton:Play()
+    self.Tweens.FadeInStatus:Play()
+end
 
-    -- Gradient
-    if windowConfig.GradientEnabled then
-        local UIGradient = Instance.new("UIGradient")
-        UIGradient.Color = ColorSequence.new(windowConfig.PrimaryColor, Color3.fromRGB(255, 255, 255))
-        UIGradient.Rotation = 45
-        UIGradient.Parent = TitleBar
-        local tween = TweenService:Create(UIGradient, TweenInfo.new(2, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), {Offset = Vector2.new(1, 0)})
-        tween:Play()
+-- Destroy GUI
+function KeySystemLibrary:Destroy()
+    self.Tweens.FadeOutFrame:Play()
+    self.Tweens.FadeOutTitle:Play()
+    self.Tweens.FadeOutInput:Play()
+    self.Tweens.FadeOutButton:Play()
+    self.Tweens.FadeOutStatus:Play()
+    
+    self.Tweens.FadeOutFrame.Completed:Connect(function()
+        self.ScreenGui:Destroy()
+    end)
+end
+
+-- Set Validation Callback
+function KeySystemLibrary:SetValidationCallback(callback)
+    self.ValidationCallback = callback
+end
+
+-- Validate Key
+function KeySystemLibrary:ValidateKey(key)
+    local success, message = false, "Invalid Key! Please try again."
+    
+    if self.ValidationCallback then
+        success, message = self.ValidationCallback(key)
+    else
+        success = key == "ABC123"
+        message = success and "Key Accepted! Access Granted." or "Invalid Key! Please try again."
     end
-
-    -- Title Label
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(0.7, 0, 1, 0)
-    TitleLabel.Position = UDim2.new(0, 10, 0, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = windowConfig.Title .. " | " .. windowConfig.Subtitle
-    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleLabel.TextSize = 16
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = TitleBar
-
-    -- Close Button
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Size = UDim2.new(0, 30, 0, 30)
-    CloseButton.Position = UDim2.new(1, -40, 0, 5)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-    CloseButton.Text = "X"
-    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseButton.TextSize = 14
-    CloseButton.Font = Enum.Font.GothamBold
-    CloseButton.Parent = TitleBar
-    local CloseUICorner = Instance.new("UICorner")
-    CloseUICorner.CornerRadius = UDim.new(0, 8)
-    CloseUICorner.Parent = CloseButton
-    CloseButton.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
-    end)
-    local function animateButton(button)
-        button.MouseEnter:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(255, 100, 100)}):Play()
-        end)
-        button.MouseLeave:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(255, 60, 60)}):Play()
-        end)
+    
+    self.StatusLabel.Text = message
+    self.StatusLabel.TextColor3 = success and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+    
+    local sound = Instance.new("Sound")
+    sound.SoundId = success and self.Config.SuccessSoundId or self.Config.ErrorSoundId
+    sound.Parent = self.MainFrame
+    sound:Play()
+    
+    if success then
+        wait(1)
+        self:Destroy()
+    else
+        self.Tweens.ShakeInput:Play()
     end
-    animateButton(CloseButton)
+end
 
-    -- Minimize Button
-    local MinimizeButton = Instance.new("TextButton")
-    MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
-    MinimizeButton.Position = UDim2.new(1, -80, 0, 5)
-    MinimizeButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-    MinimizeButton.Text = "-"
-    MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MinimizeButton.TextSize = 14
-    MinimizeButton.Font = Enum.Font.GothamBold
-    MinimizeButton.Parent = TitleBar
-    local MinimizeUICorner = Instance.new("UICorner")
-    MinimizeUICorner.CornerRadius = UDim.new(0, 8)
-    MinimizeUICorner.Parent = MinimizeButton
-    local minimized = false
-    MinimizeButton.MouseButton1Click:Connect(function()
-        minimized = not minimized
-        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = minimized and UDim2.new(0, 500, 0, 40) or UDim2.new(0, 500, 0, 350)}):Play()
-    end)
-    animateButton(MinimizeButton, {BackgroundColor3 = Color3.fromRGB(255, 200, 0)})
-
-    -- Tab System
-    local Tabs = {}
-    local TabContainer = Instance.new("Frame")
-    TabContainer.Size = UDim2.new(0, 120, 1, -40)
-    TabContainer.Position = UDim2.new(0, 0, 0, 40)
-    TabContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    TabContainer.BorderSizePixel = 0
-    TabContainer.Parent = MainFrame
-    local TabUICorner = Instance.new("UICorner")
-    TabUICorner.CornerRadius = UDim.new(0, 12)
-    TabUICorner.Parent = TabContainer
-    local TabList = Instance.new("UIListLayout")
-    TabList.Padding = UDim.new(0, 5)
-    TabList.Parent = TabContainer
-
-    -- Content Area
-    local ContentArea = Instance.new("Frame")
-    ContentArea.Size = UDim2.new(1, -120, 1, -40)
-    ContentArea.Position = UDim2.new(0, 120, 0, 40)
-    ContentArea.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    ContentArea.BorderSizePixel = 0
-    ContentArea.Parent = MainFrame
-    local ContentList = Instance.new("UIListLayout")
-    ContentList.Padding = UDim.new(0, 10)
-    ContentList.Parent = ContentArea
-
-    -- Notification System
-    local NotificationFrame = Instance.new("Frame")
-    NotificationFrame.Size = UDim2.new(0, 300, 0, 80)
-    NotificationFrame.Position = UDim2.new(1, -320, 1, -100)
-    NotificationFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    NotificationFrame.BorderSizePixel = 0
-    NotificationFrame.Parent = ScreenGui
-    local NotificationUICorner = Instance.new("UICorner")
-    NotificationUICorner.CornerRadius = UDim.new(0, 8)
-    NotificationUICorner.Parent = NotificationFrame
-    NotificationFrame.Visible = false
-
-    local NotificationTitle = Instance.new("TextLabel")
-    NotificationTitle.Size = UDim2.new(1, -20, 0, 20)
-    NotificationTitle.Position = UDim2.new(0, 10, 0, 10)
-    NotificationTitle.BackgroundTransparency = 1
-    NotificationTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    NotificationTitle.TextSize = 14
-    NotificationTitle.Font = Enum.Font.GothamBold
-    NotificationTitle.TextXAlignment = Enum.TextXAlignment.Left
-    NotificationTitle.Parent = NotificationFrame
-
-    local NotificationDesc = Instance.new("TextLabel")
-    NotificationDesc.Size = UDim2.new(1, -20, 0, 40)
-    NotificationDesc.Position = UDim2.new(0, 10, 0, 30)
-    NotificationDesc.BackgroundTransparency = 1
-    NotificationDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
-    NotificationDesc.TextSize = 12
-    NotificationDesc.Font = Enum.Font.Gotham
-    NotificationDesc.TextXAlignment = Enum.TextXAlignment.Left
-    NotificationDesc.TextYAlignment = Enum.TextYAlignment.Top
-    NotificationDesc.TextWrapped = true
-    NotificationDesc.Parent = NotificationFrame
-
-    function CleanUI:Notify(title, desc, duration)
-        NotificationTitle.Text = title
-        NotificationDesc.Text = desc
-        NotificationFrame.Visible = true
-        TweenService:Create(NotificationFrame, TweenInfo.new(0.5), {Position = UDim2.new(1, -320, 1, -100)}):Play()
-        wait(duration or 3)
-        TweenService:Create(NotificationFrame, TweenInfo.new(0.5), {Position = UDim2.new(1, 0, 1, -100)}):Play()
-        wait(0.5)
-        NotificationFrame.Visible = false
-    end
-
-    -- Key System
-    local KeySystemEnabled = config.KeySystem or false
-    local AutoCopyLink = config.AutoCopyLink or false
-    local KeyFrame = Instance.new("Frame")
-    KeyFrame.Size = UDim2.new(0, 300, 0, 150)
-    KeyFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-    KeyFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    KeyFrame.BorderSizePixel = 0
-    KeyFrame.Parent = ScreenGui
-    local KeyUICorner = Instance.new("UICorner")
-    KeyUICorner.CornerRadius = UDim.new(0, 12)
-    KeyUICorner.Parent = KeyFrame
-
-    local KeyTitle = Instance.new("TextLabel")
-    KeyTitle.Size = UDim2.new(1, 0, 0, 30)
-    KeyTitle.BackgroundTransparency = 1
-    KeyTitle.Text = "Enter Key"
-    KeyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    KeyTitle.TextSize = 16
-    KeyTitle.Font = Enum.Font.GothamBold
-    KeyTitle.Parent = KeyFrame
-
-    local KeyBox = Instance.new("TextBox")
-    KeyBox.Size = UDim2.new(1, -20, 0, 30)
-    KeyBox.Position = UDim2.new(0, 10, 0, 40)
-    KeyBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    KeyBox.Text = ""
-    KeyBox.PlaceholderText = "Enter your key here..."
-    KeyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    KeyBox.TextSize = 14
-    KeyBox.Font = Enum.Font.Gotham
-    KeyBox.Parent = KeyFrame
+-- Return Library
+return function(config)
+    return KeySystemLibrary.new(config)
+endyFrame
     local KeyBoxUICorner = Instance.new("UICorner")
     KeyBoxUICorner.CornerRadius = UDim.new(0, 8)
     KeyBoxUICorner.Parent = KeyBox
