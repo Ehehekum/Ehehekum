@@ -1,258 +1,513 @@
--- KeySystemLibrary (Loadstring-Compatible)
-local KeySystemLibrary = {}
-KeySystemLibrary.__index = KeySystemLibrary
+-- Ensure script runs in a Roblox environment
+if not game:IsLoaded() then game.Loaded:Wait() end
 
--- Services
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-
--- Default Configuration
-local DefaultConfig = {
-    Size = UDim2.new(0, 400, 0, 250),
-    BackgroundColor = Color3.fromRGB(30, 30, 30),
-    TitleText = "Key System",
-    TitleColor = Color3.fromRGB(255, 255, 255),
-    TitleFont = Enum.Font.GothamBold,
-    TitleSize = 24,
-    InputPlaceholder = "Enter your key here...",
-    InputBackground = Color3.fromRGB(40, 40, 40),
-    InputTextColor = Color3.fromRGB(200, 200, 200),
-    InputFont = Enum.Font.Gotham,
-    InputSize = 16,
-    ButtonText = "Submit",
-    ButtonBackground = Color3.fromRGB(0, 120, 255),
-    ButtonHoverColor = Color3.fromRGB(0, 150, 255),
-    ButtonTextColor = Color3.fromRGB(255, 255, 255),
-    ButtonFont = Enum.Font.GothamBold,
-    ButtonTextSize = 18,
-    CornerRadius = 12,
-    SuccessSoundId = "rbxassetid://9119747931",
-    ErrorSoundId = "rbxassetid://9119747931",
-    AnimationDuration = 0.5,
+-- Initialize environment variables for customization
+getgenv().KeySystemConfig = getgenv().KeySystemConfig or {
+    ValidKeys = {"KEY123", "KEY456", "KEY789"}, -- AE: Multiple keys
+    KeyLength = 6, -- Q: Minimum key length
+    ExpireDate = "2025-12-31", -- U: Key expiration date (YYYY-MM-DD)
+    DevBypass = {"YourUsername"}, -- AF: Developer mode bypass usernames
+    WebhookURL = "https://your-discord-webhook.com", -- Z: Discord webhook for logging
+    GetKeyURL = "https://your-discord-invite.com", -- S: Link for "Get Key" button
+    SoundId = "rbxassetid://123456789", -- D: Custom sound ID for button clicks
+    InvalidMessage = "Key salah, coba lagi bozo!", -- E: Custom invalid key message
+    Theme = "Dark", -- AN: Theme (Dark, Light, Autumn)
+    Language = game:GetService("LocalizationService").SystemLocaleId == "id-ID" and "Indonesian" or "English", -- T: Auto-detect language
+    Tips = {"Get your key from our Discord!", "Ensure your key is at least 6 characters.", "Contact support if you face issues."}, -- AQ: Loading tips
 }
 
--- Constructor
-function KeySystemLibrary.new(config)
-    local self = setmetatable({}, KeySystemLibrary)
-    self.Config = {}
-    for k, v in pairs(DefaultConfig) do
-        self.Config[k] = config and config[k] or v
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local DataStoreService = game:GetService("DataStoreService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local GuiService = game:GetService("GuiService")
+
+-- DataStore for key persistence (I)
+local KeyDataStore = DataStoreService:GetDataStore("KeySystemData")
+
+-- Local player
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- Create ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "KeySystemGui"
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+-- Create main frame with glassmorphism (AI)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150) -- W: Auto-centering
+MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MainFrame.BackgroundTransparency = 0.7
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+-- Apply glassmorphism effect with blur (AI, J)
+local BlurEffect = Instance.new("BlurEffect")
+BlurEffect.Size = 0
+BlurEffect.Parent = game:GetService("Lighting")
+local BlurTween = TweenService:Create(BlurEffect, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {Size = 10})
+BlurTween:Play()
+
+-- Create UI elements
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, 0, 0, 50)
+TitleLabel.Position = UDim2.new(0, 0, 0, 10)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = getgenv().KeySystemConfig.Language == "Indonesian" and "Sistem Kunci" or "Key System"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 24
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Parent = MainFrame
+
+-- B: Animated typewriter effect
+local function TypewriterEffect(label, text)
+    label.Text = ""
+    for i = 1, #text do
+        label.Text = string.sub(text, 1, i)
+        wait(0.05)
     end
-    self:CreateUI()
-    self:SetupAnimations()
-    self:BindEvents()
-    return self
+end
+spawn(function() TypewriterEffect(TitleLabel, TitleLabel.Text) end)
+
+-- Key input box (K, L, M, Q, AJ)
+local KeyInput = Instance.new("TextBox")
+KeyInput.Size = UDim2.new(0.8, 0, 0, 40)
+KeyInput.Position = UDim2.new(0.1, 0, 0.2, 0)
+KeyInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeyInput.Text = ""
+KeyInput.PlaceholderText = getgenv().KeySystemConfig.Language == "Indonesian" and "Masukkan Kunci..." or "Enter Key..."
+KeyInput.TextSize = 18
+KeyInput.Font = Enum.Font.Gotham
+KeyInput.Parent = MainFrame
+
+-- K: Border glow on focus
+local BorderGlow = Instance.new("UIStroke")
+BorderGlow.Thickness = 2
+BorderGlow.Color = Color3.fromRGB(0, 170, 255)
+BorderGlow.Transparency = 1
+BorderGlow.Parent = KeyInput
+KeyInput.Focused:Connect(function()
+    TweenService:Create(BorderGlow, TweenInfo.new(0.3), {Transparency = 0}):Play()
+end)
+KeyInput.FocusLost:Connect(function()
+    TweenService:Create(BorderGlow, TweenInfo.new(0.3), {Transparency = 1}):Play()
+end)
+
+-- L: Show/Hide key toggle
+local ShowHideButton = Instance.new("TextButton")
+ShowHideButton.Size = UDim2.new(0, 30, 0, 30)
+ShowHideButton.Position = UDim2.new(0.85, 5, 0.2, 5)
+ShowHideButton.BackgroundTransparency = 1
+ShowHideButton.Text = "👁️"
+ShowHideButton.TextSize = 18
+ShowHideButton.Parent = MainFrame
+local isKeyVisible = true
+ShowHideButton.MouseButton1Click:Connect(function()
+    isKeyVisible = not isKeyVisible
+    KeyInput.TextScaled = isKeyVisible
+    ShowHideButton.Text = isKeyVisible and "👁️" or "🙈"
+end)
+
+-- M: Auto-paste on CTRL+V
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.V and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        KeyInput.Text = game:GetService("ClipboardService"):GetString() or KeyInput.Text
+    end
+end)
+
+-- Verify button (D, O, P, AH)
+local VerifyButton = Instance.new("TextButton")
+VerifyButton.Size = UDim2.new(0.4, 0, 0, 40)
+VerifyButton.Position = UDim2.new(0.3, 0, 0.35, 0)
+VerifyButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+VerifyButton.Text = getgenv().KeySystemConfig.Language == "Indonesian" and "Verifikasi" or "Verify"
+VerifyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+VerifyButton.TextSize = 18
+VerifyButton.Font = Enum.Font.GothamBold
+VerifyButton.Parent = MainFrame
+
+-- O: Hover animation
+VerifyButton.MouseEnter:Connect(function()
+    TweenService:Create(VerifyButton, TweenInfo.new(0.2), {Size = UDim2.new(0.42, 0, 0, 42), BackgroundTransparency = 0.1}):Play()
+end)
+VerifyButton.MouseLeave:Connect(function()
+    TweenService:Create(VerifyButton, TweenInfo.new(0.2), {Size = UDim2.new(0.4, 0, 0, 40), BackgroundTransparency = 0}):Play()
+end)
+
+-- AH: Ripple click effect
+local function CreateRipple(parent)
+    local Ripple = Instance.new("Frame")
+    Ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Ripple.BackgroundTransparency = 0.7
+    Ripple.Size = UDim2.new(0, 0, 0, 0)
+    Ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Ripple.Parent = parent
+    TweenService:Create(Ripple, TweenInfo.new(0.5), {Size = UDim2.new(2, 0, 2, 0), BackgroundTransparency = 1}):Play()
+    wait(0.5)
+    Ripple:Destroy()
+end
+VerifyButton.MouseButton1Click:Connect(function() CreateRipple(VerifyButton) end)
+
+-- D: Sound on button click
+local ClickSound = Instance.new("Sound")
+ClickSound.SoundId = getgenv().KeySystemConfig.SoundId
+ClickSound.Parent = ScreenGui
+VerifyButton.MouseButton1Click:Connect(function() ClickSound:Play() end)
+
+-- G: Copy Key button
+local CopyKeyButton = Instance.new("TextButton")
+CopyKeyButton.Size = UDim2.new(0.4, 0, 0, 40)
+CopyKeyButton.Position = UDim2.new(0.3, 0, 0.45, 0)
+CopyKeyButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+CopyKeyButton.Text = getgenv().KeySystemConfig.Language == "Indonesian" and "Salin Kunci" or "Copy Key"
+CopyKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyKeyButton.TextSize = 18
+CopyKeyButton.Font = Enum.Font.Gotham
+CopyKeyButton.Parent = MainFrame
+CopyKeyButton.MouseButton1Click:Connect(function()
+    setclipboard(KeyInput.Text)
+    CreateNotification(getgenv().KeySystemConfig.Language == "Indonesian" and "Kunci disalin!" or "Key copied!")
+end)
+
+-- S: Get Key button
+local GetKeyButton = Instance.new("TextButton")
+GetKeyButton.Size = UDim2.new(0.4, 0, 0, 40)
+GetKeyButton.Position = UDim2.new(0.3, 0, 0.55, 0)
+GetKeyButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+GetKeyButton.Text = getgenv().KeySystemConfig.Language == "Indonesian" and "Dapatkan Kunci" or "Get Key"
+GetKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+GetKeyButton.TextSize = 18
+GetKeyButton.Font = Enum.Font.Gotham
+GetKeyButton.Parent = MainFrame
+GetKeyButton.MouseButton1Click:Connect(function()
+    game:GetService("GuiService"):OpenBrowserWindow(getgenv().KeySystemConfig.GetKeyURL)
+end)
+
+-- C: Progress circle (AO)
+local ProgressCircle = Instance.new("ImageLabel")
+ProgressCircle.Size = UDim2.new(0, 50, 0, 50)
+ProgressCircle.Position = UDim2.new(0.5, -25, 0.65, 0)
+ProgressCircle.BackgroundTransparency = 1
+ProgressCircle.Image = "rbxassetid://123456789" -- Replace with circular progress image
+ProgressCircle.Visible = false
+ProgressCircle.Parent = MainFrame
+
+-- H: Notification popup
+local function CreateNotification(message)
+    local Notification = Instance.new("TextLabel")
+    Notification.Size = UDim2.new(0, 200, 0, 50)
+    Notification.Position = UDim2.new(1, -210, 0, 10)
+    Notification.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Notification.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Notification.Text = message
+    Notification.TextSize = 14
+    Notification.Font = Enum.Font.Gotham
+    Notification.Parent = ScreenGui
+    TweenService:Create(Notification, TweenInfo.new(0.5), {Position = UDim2.new(1, -210, 0, 60)}):Play()
+    wait(3)
+    TweenService:Create(Notification, TweenInfo.new(0.5), {Position = UDim2.new(1, 0, 0, 60)}):Play()
+    wait(0.5)
+    Notification:Destroy()
 end
 
--- Create UI
-function KeySystemLibrary:CreateUI()
-    local player = Players.LocalPlayer
-    local playerGui = player:WaitForChild("PlayerGui")
-    
-    self.ScreenGui = Instance.new("ScreenGui")
-    self.ScreenGui.Name = "KeySystemGUI"
-    self.ScreenGui.ResetOnSpawn = false
-    self.ScreenGui.Parent = playerGui
-    
-    self.MainFrame = Instance.new("Frame")
-    self.MainFrame.Size = self.Config.Size
-    self.MainFrame.Position = UDim2.new(0.5, -self.Config.Size.X.Offset / 2, 0.5, -self.Config.Size.Y.Offset / 2)
-    self.MainFrame.BackgroundColor3 = self.Config.BackgroundColor
-    self.MainFrame.BorderSizePixel = 0
-    self.MainFrame.ClipsDescendants = true
-    self.MainFrame.Parent = self.ScreenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, self.Config.CornerRadius)
-    corner.Parent = self.MainFrame
-    
-    local gradient = Instance.new("UIGradient")
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
-    })
-    gradient.Rotation = 45
-    gradient.Parent = self.MainFrame
-    
-    local shadow = Instance.new("ImageLabel")
-    shadow.Image = "rbxassetid://1316045217"
-    shadow.Size = UDim2.new(1, 20, 1, 20)
-    shadow.Position = UDim2.new(0, -10, 0, -10)
-    shadow.BackgroundTransparency = 1
-    shadow.ImageTransparency = 0.8
-    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.Parent = self.MainFrame
-    
-    self.Title = Instance.new("TextLabel")
-    self.Title.Size = UDim2.new(1, 0, 0, 50)
-    self.Title.Position = UDim2.new(0, 0, 0, 10)
-    self.Title.BackgroundTransparency = 1
-    self.Title.Text = self.Config.TitleText
-    self.Title.TextColor3 = self.Config.TitleColor
-    self.Title.TextSize = self.Config.TitleSize
-    self.Title.Font = self.Config.TitleFont
-    self.Title.Parent = self.MainFrame
-    
-    self.KeyInput = Instance.new("TextBox")
-    self.KeyInput.Size = UDim2.new(0.9, 0, 0, 40)
-    self.KeyInput.Position = UDim2.new(0.05, 0, 0, 80)
-    self.KeyInput.BackgroundColor3 = self.Config.InputBackground
-    self.KeyInput.Text = ""
-    self.KeyInput.PlaceholderText = self.Config.InputPlaceholder
-    self.KeyInput.TextColor3 = self.Config.InputTextColor
-    self.KeyInput.TextSize = self.Config.InputSize
-    self.KeyInput.Font = self.Config.InputFont
-    self.KeyInput.Parent = self.MainFrame
-    
-    local inputCorner = Instance.new("UICorner")
-    inputCorner.CornerRadius = UDim.new(0, self.Config.CornerRadius - 4)
-    inputCorner.Parent = self.KeyInput
-    
-    self.SubmitButton = Instance.new("TextButton")
-    self.SubmitButton.Size = UDim2.new(0.4, 0, 0, 40)
-    self.SubmitButton.Position = UDim2.new(0.3, 0, 0, 150)
-    self.SubmitButton.BackgroundColor3 = self.Config.ButtonBackground
-    self.SubmitButton.Text = self.Config.ButtonText
-    self.SubmitButton.TextColor3 = self.Config.ButtonTextColor
-    self.SubmitButton.TextSize = self.Config.ButtonTextSize
-    self.SubmitButton.Font = self.Config.ButtonFont
-    self.SubmitButton.Parent = self.MainFrame
-    
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, self.Config.CornerRadius - 4)
-    buttonCorner.Parent = self.SubmitButton
-    
-    self.StatusLabel = Instance.new("TextLabel")
-    self.StatusLabel.Size = UDim2.new(0.9, 0, 0, 30)
-    self.StatusLabel.Position = UDim2.new(0.05, 0, 0, 200)
-    self.StatusLabel.BackgroundTransparency = 1
-    self.StatusLabel.Text = ""
-    self.StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    self.StatusLabel.TextSize = 14
-    self.StatusLabel.Font = self.Config.InputFont
-    self.StatusLabel.Parent = self.MainFrame
-end
+-- V: Particle background
+local ParticleEmitter = Instance.new("ParticleEmitter")
+ParticleEmitter.Texture = "rbxassetid://123456789" -- Replace with particle texture
+ParticleEmitter.Size = NumberSequence.new(0.1)
+ParticleEmitter.Transparency = NumberSequence.new(0.5)
+ParticleEmitter.Lifetime = NumberRange.new(2, 5)
+ParticleEmitter.Rate = 10
+ParticleEmitter.Parent = MainFrame
 
--- Setup Animations
-function KeySystemLibrary:SetupAnimations()
-    self.Tweens = {}
-    self.MainFrame.BackgroundTransparency = 1
-    self.Title.TextTransparency = 1
-    self.KeyInput.BackgroundTransparency = 1
-    self.KeyInput.TextTransparency = 1
-    self.SubmitButton.BackgroundTransparency = 1
-    self.SubmitButton.TextTransparency = 1
-    self.StatusLabel.TextTransparency = 1
-    
-    local fadeInInfo = TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    self.Tweens.FadeInFrame = TweenService:Create(self.MainFrame, fadeInInfo, {BackgroundTransparency = 0})
-    self.Tweens.FadeInTitle = TweenService:Create(self.Title, fadeInInfo, {TextTransparency = 0})
-    self.Tweens.FadeInInput = TweenService:Create(self.KeyInput, fadeInInfo, {BackgroundTransparency = 0, TextTransparency = 0})
-    self.Tweens.FadeInButton = TweenService:Create(self.SubmitButton, fadeInInfo, {BackgroundTransparency = 0, TextTransparency = 0})
-    self.Tweens.FadeInStatus = TweenService:Create(self.StatusLabel, fadeInInfo, {TextTransparency = 0})
-    
-    local fadeOutInfo = TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    self.Tweens.FadeOutFrame = TweenService:Create(self.MainFrame, fadeOutInfo, {BackgroundTransparency = 1})
-    self.Tweens.FadeOutTitle = TweenService:Create(self.Title, fadeOutInfo, {TextTransparency = 1})
-    self.Tweens.FadeOutInput = TweenService:Create(self.KeyInput, fadeOutInfo, {BackgroundTransparency = 1, TextTransparency = 1})
-    self.Tweens.FadeOutButton = TweenService:Create(self.SubmitButton, fadeOutInfo, {BackgroundTransparency = 1, TextTransparency = 1})
-    self.Tweens.FadeOutStatus = TweenService:Create(self.StatusLabel, fadeOutInfo, {TextTransparency = 1})
-    
-    local hoverInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    self.Tweens.ButtonHover = TweenService:Create(self.SubmitButton, hoverInfo, {BackgroundColor3 = self.Config.ButtonHoverColor})
-    self.Tweens.ButtonUnhover = TweenService:Create(self.SubmitButton, hoverInfo, {BackgroundColor3 = self.Config.ButtonBackground})
-    
-    self.Tweens.ShakeInput = TweenService:Create(self.KeyInput, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, 2, true), {Position = UDim2.new(0.05, 5, 0, 80)})
-end
-
--- Bind Events
-function KeySystemLibrary:BindEvents()
-    self.SubmitButton.MouseEnter:Connect(function()
-        self.Tweens.ButtonHover:Play()
-    end)
-    
-    self.SubmitButton.MouseLeave:Connect(function()
-        self.Tweens.ButtonUnhover:Play()
-    end)
-    
-    self.SubmitButton.MouseButton1Click:Connect(function()
-        self:ValidateKey(self.KeyInput.Text)
-    end)
-    
-    self.KeyInput.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            self:ValidateKey(self.KeyInput.Text)
+-- AG: 3D floating particles
+local function Create3DParticle()
+    local Particle = Instance.new("Part")
+    Particle.Size = Vector3.new(0.2, 0.2, 0.2)
+    Particle.Position = Vector3.new(math.random(-10, 10), math.random(-10, 10), math.random(-10, 10))
+    Particle.Anchored = true
+    Particle.Parent = workspace
+    spawn(function()
+        while Particle.Parent do
+            Particle.Position = Particle.Position + Vector3.new(0, 0.1, 0)
+            wait(0.1)
+            if Particle.Position.Y > 10 then Particle:Destroy() end
         end
     end)
 end
+for i = 1, 10 do spawn(Create3DParticle) end
 
--- Show GUI
-function KeySystemLibrary:Show()
-    self.Tweens.FadeInFrame:Play()
-    self.Tweens.FadeInTitle:Play()
-    self.Tweens.FadeInInput:Play()
-    self.Tweens.FadeInButton:Play()
-    self.Tweens.FadeInStatus:Play()
-end
-
--- Destroy GUI
-function KeySystemLibrary:Destroy()
-    self.Tweens.FadeOutFrame:Play()
-    self.Tweens.FadeOutTitle:Play()
-    self.Tweens.FadeOutInput:Play()
-    self.Tweens.FadeOutButton:Play()
-    self.Tweens.FadeOutStatus:Play()
-    
-    self.Tweens.FadeOutFrame.Completed:Connect(function()
-        self.ScreenGui:Destroy()
-    end)
-end
-
--- Set Validation Callback
-function KeySystemLibrary:SetValidationCallback(callback)
-    self.ValidationCallback = callback
-end
-
--- Validate Key
-function KeySystemLibrary:ValidateKey(key)
-    local success, message = false, "Invalid Key! Please try again."
-    
-    if self.ValidationCallback then
-        success, message = self.ValidationCallback(key)
-    else
-        success = key == "ABC123"
-        message = success and "Key Accepted! Access Granted." or "Invalid Key! Please try again."
-    end
-    
-    self.StatusLabel.Text = message
-    self.StatusLabel.TextColor3 = success and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-    
-    local sound = Instance.new("Sound")
-    sound.SoundId = success and self.Config.SuccessSoundId or self.Config.ErrorSoundId
-    sound.Parent = self.MainFrame
-    sound:Play()
-    
-    if success then
+-- AL: Real-time clock
+local ClockLabel = Instance.new("TextLabel")
+ClockLabel.Size = UDim2.new(0, 100, 0, 20)
+ClockLabel.Position = UDim2.new(0, 10, 0, 10)
+ClockLabel.BackgroundTransparency = 1
+ClockLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClockLabel.TextSize = 14
+ClockLabel.Font = Enum.Font.Gotham
+ClockLabel.Parent = MainFrame
+spawn(function()
+    while true do
+        ClockLabel.Text = os.date("%H:%M:%S %Y-%m-%d")
         wait(1)
-        self:Destroy()
-    else
-        self.Tweens.ShakeInput:Play()
     end
+end)
+
+-- Y: Key usage counter
+local UsageCounter = Instance.new("TextLabel")
+UsageCounter.Size = UDim2.new(0, 100, 0, 20)
+UsageCounter.Position = UDim2.new(0, 10, 0, 30)
+UsageCounter.BackgroundTransparency = 1
+UsageCounter.TextColor3 = Color3.fromRGB(255, 255, 255)
+UsageCounter.TextSize = 14
+UsageCounter.Font = Enum.Font.Gotham
+UsageCounter.Text = "Key Usage: 0"
+UsageCounter.Parent = MainFrame
+
+-- Verification logic (A, I, P, Q, U, Z, AE, AF)
+local isVerifying = false
+local function VerifyKey(key)
+    if isVerifying then return end -- P: Anti-spam
+    isVerifying = true
+    ProgressCircle.Visible = true
+    local Tween = TweenService:Create(ProgressCircle, TweenInfo.new(2), {Rotation = 360})
+    Tween:Play()
+
+    -- Q: Key length checker
+    if #key < getgenv().KeySystemConfig.KeyLength then
+        CreateNotification(getgenv().KeySystemConfig.InvalidMessage)
+        isVerifying = false
+        ProgressCircle.Visible = false
+        return
+    end
+
+    -- U: Key expiration checker
+    if os.date("%Y-%m-%d") > getgenv().KeySystemConfig.ExpireDate then
+        CreateNotification("Key has expired!")
+        isVerifying = false
+        ProgressCircle.Visible = false
+        return
+    end
+
+    -- AF: Developer mode bypass
+    if table.find(getgenv().KeySystemConfig.DevBypass, Player.Name) then
+        KeyDataStore:SetAsync(Player.UserId .. "_Key", key)
+        CreateNotification("Developer bypass activated!")
+        SuccessAnimation()
+        return
+    end
+
+    -- AE: Multiple keys check
+    local isValid = false
+    for _, validKey in ipairs(getgenv().KeySystemConfig.ValidKeys) do
+        if key == validKey then
+            isValid = true
+            break
+        end
+    end
+
+    -- F: Fetch key from URL
+    if not isValid then
+        local success, response = pcall(function()
+            return HttpService:GetAsync("https://your-pastebin-or-github-raw-url.com") -- Replace with your URL
+        end)
+        if success and response == key then
+            isValid = true
+        end
+    end
+
+    if isValid then
+        -- A, I: Save key to DataStore
+        KeyDataStore:SetAsync(Player.UserId .. "_Key", key)
+        -- Y: Update usage counter
+        local usage = KeyDataStore:GetAsync(Player.UserId .. "_Usage") or 0
+        KeyDataStore:SetAsync(Player.UserId .. "_Usage", usage + 1)
+        UsageCounter.Text = "Key Usage: " .. (usage + 1)
+        -- Z: Log to webhook
+        pcall(function()
+            HttpService:PostAsync(getgenv().KeySystemConfig.WebhookURL, HttpService:JSONEncode({
+                content = "Player " .. Player.Name .. " used key: " .. key
+            }))
+        end)
+        -- AS: Achievement popup
+        if usage == 0 then
+            CreateNotification("✅ ACCESS GRANTED")
+        end
+        SuccessAnimation()
+    else
+        CreateNotification(getgenv().KeySystemConfig.InvalidMessage)
+    end
+    isVerifying = false
+    ProgressCircle.Visible = false
 end
 
--- Return Library
-return function(config)
-    return KeySystemLibrary.new(config)
-endyFrame
-    local KeyBoxUICorner = Instance.new("UICorner")
-    KeyBoxUICorner.CornerRadius = UDim.new(0, 8)
-    KeyBoxUICorner.Parent = KeyBox
+-- R: Success animation
+local function SuccessAnimation()
+    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.5), {Size = UDim2.new(0, 420, 0, 320), BackgroundTransparency = 1})
+    tween:Play()
+    wait(0.5)
+    ScreenGui:Destroy()
+    BlurEffect:Destroy()
+    -- AD: Return function and table for reuse
+    return {
+        KeySystem = {
+            IsValid = true,
+            Key = KeyInput.Text
+        }
+    }
+end
 
-    local KeyButton = Instance.new("TextButton")
-    KeyButton.Size = UDim2.new(1, -20, 0, 30)
-    KeyButton.Position = UDim2.new(0, 10, 0, 80)
-    KeyButton.BackgroundColor3 = windowConfig.PrimaryColor
-    KeyButton.Text = "Submit"
+-- AB: Enter key to submit
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Return then
+        VerifyKey(KeyInput.Text)
+    end
+end)
+VerifyButton.MouseButton1Click:Connect(function() VerifyKey(KeyInput.Text) end)
+
+-- N: Draggable window
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- AC: Fade-in staggered animation
+local function FadeIn(element)
+    element.BackgroundTransparency = 1
+    element.TextTransparency = 1
+    TweenService:Create(element, TweenInfo.new(0.5), {BackgroundTransparency = element.BackgroundTransparency - 0.3, TextTransparency = 0}):Play()
+end
+FadeIn(TitleLabel)
+wait(0.2)
+FadeIn(KeyInput)
+wait(0.2)
+FadeIn(VerifyButton)
+wait(0.2)
+FadeIn(CopyKeyButton)
+wait(0.2)
+FadeIn(GetKeyButton)
+
+-- AK: Heartbeat animation
+spawn(function()
+    while MainFrame.Parent do
+        TweenService:Create(MainFrame, TweenInfo.new(1), {Size = UDim2.new(0, 410, 0, 310)}):Play()
+        wait(1)
+        TweenService:Create(MainFrame, TweenInfo.new(1), {Size = UDim2.new(0, 400, 0, 300)}):Play()
+        wait(1)
+    end
+end)
+
+-- AM: Proximity parallax
+RunService.RenderStepped:Connect(function()
+    local mousePos = UserInputService:GetMouseLocation()
+    local center = MainFrame.AbsolutePosition + MainFrame.AbsoluteSize / 2
+    local offset = (mousePos - center) / 1000
+    MainFrame.Position = UDim2.new(0.5, -200 - offset.X, 0.5, -150 - offset.Y)
+end)
+
+-- AN: Theming system
+local function ApplyTheme(theme)
+    if theme == "Dark" then
+        MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        VerifyButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    elseif theme == "Light" then
+        MainFrame.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
+        VerifyButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    elseif theme == "Autumn" then
+        MainFrame.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
+        VerifyButton.BackgroundColor3 = Color3.fromRGB(150, 50, 0)
+    end
+end
+ApplyTheme(getgenv().KeySystemConfig.Theme)
+
+-- AQ: Loading tips
+local TipLabel = Instance.new("TextLabel")
+TipLabel.Size = UDim2.new(0.8, 0, 0, 20)
+TipLabel.Position = UDim2.new(0.1, 0, 0.75, 0)
+TipLabel.BackgroundTransparency = 1
+TipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TipLabel.TextSize = 14
+TipLabel.Font = Enum.Font.Gotham
+TipLabel.Parent = MainFrame
+spawn(function()
+    while MainFrame.Parent do
+        TipLabel.Text = getgenv().KeySystemConfig.Tips[math.random(1, #getgenv().KeySystemConfig.Tips)]
+        wait(2)
+    end
+end)
+
+-- I: Check saved key
+local savedKey = KeyDataStore:GetAsync(Player.UserId .. "_Key")
+if savedKey and table.find(getgenv().KeySystemConfig.ValidKeys, savedKey) then
+    SuccessAnimation()
+end
+
+-- AT: Anti-tamper
+if not pcall(function() return game:GetService("CoreGui") end) then
+    ScreenGui:Destroy()
+    BlurEffect:Destroy()
+end
+
+-- AU: Auto-scale on resolution change
+GuiService:GetPropertyChangedSignal("ScreenResolution"):Connect(function()
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+end)
+
+-- AV: Tooltips
+local function CreateTooltip(element, text)
+    local Tooltip = Instance.new("TextLabel")
+    Tooltip.Size = UDim2.new(0, 150, 0, 30)
+    Tooltip.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Tooltip.Text = text
+    Tooltip.TextSize = 12
+    Tooltip.Visible = false
+    Tooltip.Parent = ScreenGui
+    element.MouseEnter:Connect(function()
+        Tooltip.Position = UDim2.new(0, UserInputService:GetMouseLocation().X, 0, UserInputService:GetMouseLocation().Y - 40)
+        Tooltip.Visible = true
+    end)
+    element.MouseLeave:Connect(function() Tooltip.Visible = false end)
+end
+CreateTooltip(KeyInput, "Enter your key here")
+CreateTooltip(VerifyButton, "Click to verify key")
+CreateTooltip(CopyKeyButton, "Copy the entered key")
+CreateTooltip(GetKeyButton, "Get a new key")
+
+-- AD: Return KeySystem module
+return {
+    KeySystem = {
+        Verify = VerifyKey,
+        Config = getgenv().KeySystemConfig
+    }
+}"
     KeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     KeyButton.TextSize = 14
     KeyButton.Font = Enum.Font.GothamBold
