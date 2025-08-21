@@ -1,253 +1,274 @@
--- Debug Notification UI for Roblox
-print("Loading Notification UI...")
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomNotifUI"
+screenGui.Parent = playerGui
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.ResetOnSpawn = false
 
-local NotificationUI = {}
-
--- Services
-local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local SoundService = game:GetService("SoundService")
-
--- Theme Definitions
-local THEMES = {
-    Scene = {
-        BackgroundColor = Color3.fromRGB(40, 40, 40),
-        TextColor = Color3.fromRGB(255, 255, 255),
-        AccentColor = Color3.fromRGB(255, 100, 100),
-        Gradient = true,
-        Font = Enum.Font.SourceSansPro, -- Fallback to safer font
-    },
-    Space = {
-        BackgroundColor = Color3.fromRGB(10, 10, 20),
-        TextColor = Color3.fromRGB(200, 200, 255),
-        AccentColor = Color3.fromRGB(100, 150, 255),
-        Gradient = false,
-        Font = Enum.Font.SourceSansPro,
-        StarEffect = true,
-    },
-    Rainbow = {
-        BackgroundColor = Color3.fromRGB(50, 50, 50),
-        TextColor = Color3.fromRGB(255, 255, 255),
-        AccentColor = Color3.fromRGB(255, 255, 255),
-        Gradient = "Rainbow",
-        Font = Enum.Font.SourceSansPro,
-    },
-    Goth = {
-        BackgroundColor = Color3.fromRGB(20, 20, 20),
-        TextColor = Color3.fromRGB(200, 150, 200),
-        AccentColor = Color3.fromRGB(100, 0, 100),
-        Gradient = false,
-        Font = Enum.Font.SourceSansPro,
-    },
-    Ocean = {
-        BackgroundColor = Color3.fromRGB(0, 50, 100),
-        TextColor = Color3.fromRGB(200, 255, 255),
-        AccentColor = Color3.fromRGB(0, 150, 200),
-        Gradient = false,
-        Font = Enum.Font.SourceSansPro,
-        WaveEffect = true,
+-- Global notification table
+getgenv().notif = {
+    List = {},
+    Settings = {
+        DisplayTime = 4,
+        MaxNotifications = 5,
+        AnimationSpeed = 0.3,
+        Theme = "Dark", -- Default theme
+        EnabledTypes = {
+            Info = false, -- Default to false, controlled in example
+            Choice = false -- Default to false, controlled in example
+        }
     }
 }
 
--- Default Configuration
-local CONFIG = {
-    FadeTime = 0.5,
-    SlideTime = 0.7,
-    CornerRadius = UDim.new(0, 10),
-    MaxNotifications = 5,
-    DefaultPosition = "TopRight",
-    DefaultSoundId = "rbxassetid://9120386446",
+-- Theme color palettes
+local themes = {
+    Dark = {
+        Background = Color3.fromRGB(30, 30, 30),
+        Text = Color3.fromRGB(255, 255, 255),
+        Accent = Color3.fromRGB(0, 170, 255),
+        Border = Color3.fromRGB(50, 50, 50)
+    },
+    Light = {
+        Background = Color3.fromRGB(240, 240, 240),
+        Text = Color3.fromRGB(20, 20, 20),
+        Accent = Color3.fromRGB(0, 120, 255),
+        Border = Color3.fromRGB(200, 200, 200)
+    },
+    Rainbow = {
+        Background = Color3.fromRGB(30, 30, 30),
+        Text = Color3.fromRGB(255, 255, 255),
+        Accent = Color3.fromRGB(255, 0, 0), -- Will be animated
+        Border = Color3.fromRGB(50, 50, 50)
+    },
+    Epilepsy = {
+        Background = Color3.fromRGB(30, 30, 30),
+        Text = Color3.fromRGB(255, 255, 255),
+        Accent = Color3.fromRGB(255, 255, 0), -- Rapid color changes
+        Border = Color3.fromRGB(50, 50, 50)
+    }
 }
 
--- Local player and GUI
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-local screenGui = playerGui:FindFirstChild("NotificationGui") or Instance.new("ScreenGui")
-screenGui.Name = "NotificationGui"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
-print("ScreenGui created")
+-- Update notification positions with smooth stacking
+local function updateNotificationPositions()
+    for i, notifFrame in ipairs(getgenv().notif.List) do
+        local targetY = -((150 + 10) * (i - 1) + 15)
+        notifFrame:TweenPosition(
+            UDim2.new(1, -15, 1, targetY),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Sine,
+            getgenv().notif.Settings.AnimationSpeed,
+            true
+        )
+    end
+end
 
--- Notification queue
-local notificationQueue = _G.notificationQueue or {}
-_G.notificationQueue = notificationQueue
-local activeNotifications = _G.activeNotifications or 0
-_G.activeNotifications = activeNotifications
+-- Rainbow animation for Rainbow theme
+local function startRainbowAnimation(frame, accentPart)
+    spawn(function()
+        while frame.Parent do
+            for i = 0, 1, 0.02 do
+                if not frame.Parent then break end
+                accentPart.BackgroundColor3 = Color3.fromHSV(i, 1, 1)
+                wait(0.05)
+            end
+        end
+    end)
+end
 
--- Create a notification
-function NotificationUI:Notify(options)
-    print("Creating notification...")
-    options = options or {}
-    local title = options.Title or "Notification"
-    local description = options.Description or "Default notification."
-    local duration = options.Duration or 5
-    local theme = THEMES[options.Theme or "Scene"] or THEMES.Scene
-    local soundId = options.SoundId or CONFIG.DefaultSoundId
-    local position = options.Position or CONFIG.DefaultPosition
-    local fadeTime = options.FadeTime or CONFIG.FadeTime
-    local slideTime = options.SlideTime or CONFIG.SlideTime
+-- Epilepsy animation (rapid flashing, use with caution)
+local function startEpilepsyAnimation(frame, accentPart)
+    spawn(function()
+        while frame.Parent do
+            if not frame.Parent then break end
+            accentPart.BackgroundColor3 = Color3.fromRGB(
+                math.random(0, 255),
+                math.random(0, 255),
+                math.random(0, 255)
+            )
+            wait(0.1)
+        end
+    end)
+end
 
-    -- Calculate position
-    local yOffset = position == "BottomRight" and (1 - (activeNotifications * 0.15)) or (activeNotifications * 0.15)
-    local startPos = position == "BottomRight" and UDim2.new(1, 20, 1, -120) or UDim2.new(1, 20, 0, 20 + (activeNotifications * 120))
-    local endPos = position == "BottomRight" and UDim2.new(1, -320, 1, -120) or UDim2.new(1, -320, 0, 20 + (activeNotifications * 120))
+-- Create notification frame
+local function createNotification(contentText, titleText, notifType, options, iconId)
+    if not getgenv().notif.Settings.EnabledTypes[notifType] then return end
+    if #getgenv().notif.List >= getgenv().notif.Settings.MaxNotifications then
+        local oldestNotif = table.remove(getgenv().notif.List, #getgenv().notif.List)
+        if oldestNotif then oldestNotif:Destroy() end
+    end
 
-    -- Create notification frame
-    local notificationFrame = Instance.new("Frame")
-    notificationFrame.Size = UDim2.new(0, 300, 0, 100)
-    notificationFrame.Position = startPos
-    notificationFrame.BackgroundColor3 = theme.BackgroundColor
-    notificationFrame.BorderSizePixel = 0
-    notificationFrame.ClipsDescendants = true
-    notificationFrame.Parent = screenGui
-    print("Notification frame created")
+    local theme = themes[getgenv().notif.Settings.Theme]
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 350, 0, 150)
+    frame.Position = UDim2.new(1, 15, 1, 0)
+    frame.AnchorPoint = Vector2.new(1, 1)
+    frame.BackgroundColor3 = theme.Background
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    frame.ClipsDescendants = true
 
-    -- Rounded corners
     local uiCorner = Instance.new("UICorner")
-    uiCorner.CornerRadius = CONFIG.CornerRadius
-    uiCorner.Parent = notificationFrame
+    uiCorner.CornerRadius = UDim.new(0, 12)
+    uiCorner.Parent = frame
 
-    -- Gradient
-    if theme.Gradient then
-        local uiGradient = Instance.new("UIGradient")
-        uiGradient.Parent = notificationFrame
-        if theme.Gradient == "Rainbow" then
-            uiGradient.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-                ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 255, 0)),
-                ColorSequenceKeypoint.new(0.4, Color3.fromRGB(0, 255, 0)),
-                ColorSequenceKeypoint.new(0.6, Color3.fromRGB(0, 255, 255)),
-                ColorSequenceKeypoint.new(0.8, Color3.fromRGB(0, 0, 255)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))
-            })
-            local tween = TweenService:Create(uiGradient, TweenInfo.new(2, Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1), {Rotation = 360})
-            tween:Play()
-            print("Rainbow gradient applied")
-        else
-            uiGradient.Color = ColorSequence.new(theme.BackgroundColor, Color3.fromRGB(theme.BackgroundColor.R * 255 * 0.7, theme.BackgroundColor.G * 255 * 0.7, theme.BackgroundColor.B * 255 * 0.7))
-        end
-    end
+    local uiStroke = Instance.new("UIStroke")
+    uiStroke.Color = theme.Border
+    uiStroke.Thickness = 2
+    uiStroke.Parent = frame
 
-    -- Title label
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0.9, 0, 0, 30)
-    titleLabel.Position = UDim2.new(0.05, 0, 0, 10)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = theme.TextColor
-    titleLabel.Font = theme.Font
-    titleLabel.TextSize = 18
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Parent = notificationFrame
+    local accentBar = Instance.new("Frame")
+    accentBar.Size = UDim2.new(0, 8, 1, 0)
+    accentBar.Position = UDim2.new(0, 0, 0, 0)
+    accentBar.BackgroundColor3 = theme.Accent
+    accentBar.BorderSizePixel = 0
+    accentBar.Parent = frame
 
-    -- Description label
-    local descLabel = Instance.new("TextLabel")
-    descLabel.Size = UDim2.new(0.9, 0, 0, 40)
-    descLabel.Position = UDim2.new(0.05, 0, 0, 40)
-    descLabel.BackgroundTransparency = 1
-    descLabel.Text = description
-    descLabel.TextColor3 = theme.TextColor
-    descLabel.Font = theme.Font
-    descLabel.TextSize = 14
-    descLabel.TextXAlignment = Enum.TextXAlignment.Left
-    descLabel.TextWrapped = true
-    descLabel.Parent = notificationFrame
-    print("Labels created")
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Parent = frame
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.new(0.05, 0, 0.08, 0)
+    title.Size = UDim2.new(0, 250, 0, 30)
+    title.Font = Enum.Font.GothamBold
+    title.Text = titleText or notifType
+    title.TextColor3 = theme.Text
+    title.TextScaled = true
+    title.TextWrapped = true
+    title.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Progress bar
-    local progressBar = Instance.new("Frame")
-    progressBar.Size = UDim2.new(1, 0, 0, 4)
-    progressBar.Position = UDim2.new(0, 0, 1, -4)
-    progressBar.BackgroundColor3 = theme.AccentColor
-    progressBar.BorderSizePixel = 0
-    progressBar.Parent = notificationFrame
+    local content = Instance.new("TextLabel")
+    content.Name = "Content"
+    content.Parent = frame
+    content.BackgroundTransparency = 1
+    content.Position = UDim2.new(0.05, 0, 0.28, 0)
+    content.Size = UDim2.new(0, 300, 0, 60)
+    content.Font = Enum.Font.Gotham
+    content.Text = contentText or "Notification Content"
+    content.TextColor3 = theme.Text
+    content.TextSize = 18
+    content.TextWrapped = true
+    content.TextXAlignment = Enum.TextXAlignment.Left
+    content.TextYAlignment = Enum.TextYAlignment.Top
 
-    -- Wave effect for Ocean
-    if theme.WaveEffect then
-        local waveTween = TweenService:Create(progressBar, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Position = UDim2.new(0, 0, 1, -8)})
-        waveTween:Play()
-        print("Ocean wave effect applied")
-    end
+    local image = Instance.new("ImageLabel")
+    image.Parent = frame
+    image.BackgroundTransparency = 1
+    image.Position = UDim2.new(0.85, 0, 0.08, 0)
+    image.Size = UDim2.new(0, 40, 0, 40)
+    image.Image = iconId or "rbxassetid://112082878863231" -- Default icon
 
-    -- Star effect for Space
-    if theme.StarEffect then
-        local flickerTween = TweenService:Create(notificationFrame, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true), {BackgroundTransparency = 0.3})
-        flickerTween:Play()
-        print("Space star effect applied")
-    end
+    -- Handle choice notification
+    if notifType == "Choice" and options then
+        local buttonFrame = Instance.new("Frame")
+        buttonFrame.Size = UDim2.new(0, 300, 0, 30)
+        buttonFrame.Position = UDim2.new(0.05, 0, 0.65, 0)
+        buttonFrame.BackgroundTransparency = 1
+        buttonFrame.Parent = frame
 
-    -- Play sound
-    if soundId then
-        local success, err = pcall(function()
-            local sound = Instance.new("Sound")
-            sound.SoundId = soundId
-            sound.Volume = 0.5
-            sound.Parent = SoundService
-            sound:Play()
-            game.Debris:AddItem(sound, 5)
+        local acceptButton = Instance.new("TextButton")
+        acceptButton.Size = UDim2.new(0, 100, 0, 30)
+        acceptButton.Position = UDim2.new(0, 0, 0, 0)
+        acceptButton.BackgroundColor3 = theme.Accent
+        acceptButton.Text = options.AcceptText or "Accept"
+        acceptButton.TextColor3 = theme.Text
+        acceptButton.Font = Enum.Font.Gotham
+        acceptButton.TextScaled = true
+        acceptButton.Parent = buttonFrame
+        local acceptCorner = Instance.new("UICorner")
+        acceptCorner.CornerRadius = UDim.new(0, 8)
+        acceptCorner.Parent = acceptButton
+
+        local declineButton = Instance.new("TextButton")
+        declineButton.Size = UDim2.new(0, 100, 0, 30)
+        declineButton.Position = UDim2.new(0.67, 0, 0, 0)
+        declineButton.BackgroundColor3 = theme.Border
+        declineButton.Text = options.DeclineText or "Decline"
+        declineButton.TextColor3 = theme.Text
+        declineButton.Font = Enum.Font.Gotham
+        declineButton.TextScaled = true
+        declineButton.Parent = buttonFrame
+        local declineCorner = Instance.new("UICorner")
+        declineCorner.CornerRadius = UDim.new(0, 8)
+        declineCorner.Parent = declineButton
+
+        acceptButton.MouseButton1Click:Connect(function()
+            if options.AcceptCallback then options.AcceptCallback() end
+            frame:Destroy()
+            table.remove(getgenv().notif.List, table.find(getgenv().notif.List, frame))
+            updateNotificationPositions()
         end)
-        if not success then
-            print("Sound failed to play: " .. tostring(err))
-        else
-            print("Sound played: " .. soundId)
-        end
+
+        declineButton.MouseButton1Click:Connect(function()
+            if options.DeclineCallback then options.DeclineCallback() end
+            frame:Destroy()
+            table.remove(getgenv().notif.List, table.find(getgenv().notif.List, frame))
+            updateNotificationPositions()
+        end)
     end
 
-    -- Animations
-    local tweenInfo = TweenInfo.new(slideTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-    local fadeInInfo = TweenInfo.new(fadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
-    local slideIn = TweenService:Create(notificationFrame, tweenInfo, {Position = endPos})
-    local fadeIn = TweenService:Create(notificationFrame, fadeInInfo, {BackgroundTransparency = theme.StarEffect and 0.1 or 0.1})
-    local fadeInTitle = TweenService:Create(titleLabel, fadeInInfo, {TextTransparency = 0})
-    local fadeInDesc = TweenService:Create(descLabel, fadeInInfo, {TextTransparency = 0})
-    local scaleProgress = TweenService:Create(progressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 4)})
+    -- Theme-specific animations
+    if getgenv().notif.Settings.Theme == "Rainbow" then
+        startRainbowAnimation(frame, accentBar)
+    elseif getgenv().notif.Settings.Theme == "Epilepsy" then
+        startEpilepsyAnimation(frame, accentBar)
+    end
 
-    -- Initial states
-    notificationFrame.BackgroundTransparency = 1
-    titleLabel.TextTransparency = 1
-    descLabel.TextTransparency = 1
+    table.insert(getgenv().notif.List, 1, frame)
 
-    -- Play animations
-    slideIn:Play()
-    fadeIn:Play()
-    fadeInTitle:Play()
-    fadeInDesc:Play()
-    print("Animations started")
+    -- Smooth entrance animation
+    frame:TweenPosition(
+        UDim2.new(1, -15, 1, -15),
+        Enum.EasingDirection.Out,
+        Enum.EasingStyle.Back,
+        getgenv().notif.Settings.AnimationSpeed,
+        true
+    )
 
-    -- Increment active notifications
-    activeNotifications = activeNotifications + 1
-    _G.activeNotifications = activeNotifications
+    -- Exit animation after display time (except for Choice)
+    if notifType ~= "Choice" then
+        task.delay(getgenv().notif.Settings.DisplayTime, function()
+            frame:TweenPosition(
+                UDim2.new(1, 15, 1, frame.Position.Y.Offset),
+                Enum.EasingDirection.In,
+                Enum.EasingStyle.Sine,
+                getgenv().notif.Settings.AnimationSpeed,
+                true
+            )
+            task.wait(getgenv().notif.Settings.AnimationSpeed)
+            frame:Destroy()
+            table.remove(getgenv().notif.List, table.find(getgenv().notif.List, frame))
+            updateNotificationPositions()
+        end)
+    end
 
-    -- Click-to-dismiss
-    local clickButton = Instance.new("TextButton")
-    clickButton.Size = UDim2.new(1, 0, 1, 0)
-    clickButton.BackgroundTransparency = 1
-    clickButton.Text = ""
-    clickButton.Parent = notificationFrame
+    updateNotificationPositions()
+end
 
-    -- Dismiss function
-    local dismissed = false
-    local function dismiss()
-        if dismissed then return end
-        dismissed = true
-        local fadeOutInfo = TweenInfo.new(fadeTime, Enum.EasingStyle.Linear, Enum.EasingDirection.In)
-        local fadeOut = TweenService:Create(notificationFrame, fadeOutInfo, {BackgroundTransparency = 1})
-        local fadeOutTitle = TweenService:Create(titleLabel, fadeOutInfo, {TextTransparency = 1})
-        local fadeOutDesc = TweenService:Create(descLabel, fadeOutInfo, {TextTransparency = 1})
-        local slideOut = TweenService:Create(notificationFrame, tweenInfo, {Position = startPos})
+-- Notification functions
+getgenv().notif.Info = function(content, title, iconId)
+    createNotification(content or "Info notification", title or "Info", "Info", nil, iconId)
+end
 
-        fadeOut:Play()
-        fadeOutTitle:Play()
-        fadeOutDesc:Play()
-        slideOut:Play()
+getgenv().notif.Choice = function(content, title, options, iconId)
+    createNotification(content or "Choice notification", title or "Choice", "Choice", options or {}, iconId)
+end
 
-        slideOut.Completed:Connect(function()
-            notificationFrame:Destroy()
-            activeNotifications = activeNotifications - 1
-            _G.activeNotifications = activeNotifications
-            for i, frame in ipairs(notificationQueue) do
-                if frame and frame.Parent then
-                    local yPos = position == "BottomRight" and (1 - ((i - 1) * 0.15)) or ((i - 1) * 0.15)
+-- Theme setting function
+getgenv().notif.SetTheme = function(themeName)
+    if themes[themeName] then
+        getgenv().notif.Settings.Theme = themeName
+    end
+end
+
+-- Enable/disable notification types
+getgenv().notif.SetTypeEnabled = function(typeName, enabled)
+    if getgenv().notif.Settings.EnabledTypes[typeName] ~= nil then
+        getgenv().notif.Settings.EnabledTypes[typeName] = enabled
+    end
+endmRight" and (1 - ((i - 1) * 0.15)) or ((i - 1) * 0.15)
                     local tween = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
                         Position = position == "BottomRight" and UDim2.new(1, -320, 1, -120 - ((i - 1) * 120)) or UDim2.new(1, -320, 0, 20 + ((i - 1) * 120))
                     })
