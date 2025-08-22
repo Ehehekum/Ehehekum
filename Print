@@ -1,0 +1,6 @@
+-- Script file you put on GitHub
+-- This script uses getgenv to allow customization
+
+local text = getgenv().CustomText or "Default text here"
+
+print(text)
