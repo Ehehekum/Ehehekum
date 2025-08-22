@@ -1,6 +1,14 @@
--- Script file you put on GitHub
--- This script uses getgenv to allow customization
+-- Script file you upload to GitHub
+-- Customizable notification using getgenv
 
-local text = getgenv().CustomText or "Default text here"
+local StarterGui = game:GetService("StarterGui")
 
-print(text)
+local title = getgenv().NotifyTitle or "Notification"
+local text = getgenv().NotifyText or "Default text"
+local duration = getgenv().NotifyDuration or 5  -- seconds
+
+StarterGui:SetCore("SendNotification", {
+    Title = title;
+    Text = text;
+    Duration = duration;
+})
