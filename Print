@@ -1,145 +1,156 @@
---// Notification System
--- Place in LocalScript or Module
-
+-- Custom Roblox Notification System
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local PlayerGui = player:WaitForChild("PlayerGui")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local NotifyUI = Instance.new("ScreenGui")
-NotifyUI.Name = "CustomNotifyUI"
-NotifyUI.ResetOnSpawn = false
-NotifyUI.Parent = PlayerGui
-
--- Themes
-local Themes = {
-    ["Neon"] = {BG = Color3.fromRGB(25, 25, 35), Accent = Color3.fromRGB(0, 255, 200)},
-    ["Dark"] = {BG = Color3.fromRGB(20, 20, 20), Accent = Color3.fromRGB(100, 100, 255)},
-    ["Light"] = {BG = Color3.fromRGB(245, 245, 245), Accent = Color3.fromRGB(80, 80, 80)},
-    ["Cyber"] = {BG = Color3.fromRGB(10, 10, 30), Accent = Color3.fromRGB(255, 50, 150)},
+-- Default values if not set via getgenv
+getgenv().NotificationConfig = getgenv().NotificationConfig or {
+    Type = "Info", -- "Info" or "Option"
+    Message = "Default Notification: Welcome to Roblox!",
+    Duration = 5, -- Duration in seconds (for Info type)
+    Icon = "rbxassetid://1234567890", -- Default icon (replace with valid asset ID)
+    SoundId = "rbxassetid://9120386446" -- Default sound (Roblox notification sound)
 }
 
--- Function to create notification
-local function CreateNotification(data, isOption)
-    local Title = data.Title or "Notification"
-    local Text = data.Text or ""
-    local Duration = data.Duration or 5
-    local Theme = Themes[data.Theme] or Themes["Neon"]
+-- Create ScreenGui
+local function createNotification()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "CustomNotification"
+    ScreenGui.Parent = PlayerGui
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
+    -- Create main frame
     local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 300, 0, isOption and 140 or 100)
-    Frame.Position = UDim2.new(1, 10, 1, -120)
-    Frame.BackgroundColor3 = Theme.BG
+    Frame.Size = UDim2.new(0, 300, 0, 100)
+    Frame.Position = UDim2.new(1, 20, 0, 50) -- Start off-screen (right)
+    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     Frame.BorderSizePixel = 0
-    Frame.AnchorPoint = Vector2.new(1, 1)
-    Frame.Parent = NotifyUI
-    Frame.BackgroundTransparency = 0.1
+    Frame.Parent = ScreenGui
     Frame.ClipsDescendants = true
-    Frame.Visible = true
-    Frame.ZIndex = 10
 
-    local UICorner = Instance.new("UICorner", Frame)
-    UICorner.CornerRadius = UDim.new(0, 12)
+    -- Add corner rounding
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 10)
+    UICorner.Parent = Frame
 
-    local UIStroke = Instance.new("UIStroke", Frame)
-    UIStroke.Thickness = 2
-    UIStroke.Color = Theme.Accent
+    -- Add gradient
+    local UIGradient = Instance.new("UIGradient")
+    UIGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 70, 70))
+    }
+    UIGradient.Rotation = 45
+    UIGradient.Parent = Frame
 
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(1, -20, 0, 30)
-    TitleLabel.Position = UDim2.new(0, 10, 0, 5)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = Title
-    TitleLabel.TextColor3 = Theme.Accent
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextSize = 18
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = Frame
+    -- Add shadow
+    local Shadow = Instance.new("ImageLabel")
+    Shadow.Size = UDim2.new(1, 10, 1, 10)
+    Shadow.Position = UDim2.new(0, -5, 0, -5)
+    Shadow.BackgroundTransparency = 1
+    Shadow.Image = "rbxassetid://1316045217" -- Roblox shadow asset
+    Shadow.ImageTransparency = 0.5
+    Shadow.ZIndex = -1
+    Shadow.Parent = Frame
 
-    local TextLabel = Instance.new("TextLabel")
-    TextLabel.Size = UDim2.new(1, -20, 0, 40)
-    TextLabel.Position = UDim2.new(0, 10, 0, 35)
-    TextLabel.BackgroundTransparency = 1
-    TextLabel.Text = Text
-    TextLabel.TextWrapped = true
-    TextLabel.TextColor3 = Theme.Accent
-    TextLabel.Font = Enum.Font.Gotham
-    TextLabel.TextSize = 15
-    TextLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TextLabel.TextYAlignment = Enum.TextYAlignment.Top
-    TextLabel.Parent = Frame
+    -- Add icon
+    local Icon = Instance.new("ImageLabel")
+    Icon.Size = UDim2.new(0, 40, 0, 40)
+    Icon.Position = UDim2.new(0, 10, 0, 10)
+    Icon.BackgroundTransparency = 1
+    Icon.Image = getgenv().NotificationConfig.Icon
+    Icon.Parent = Frame
 
-    -- Option buttons
-    local Button1, Button2
-    if isOption then
-        Button1 = Instance.new("TextButton")
-        Button1.Size = UDim2.new(0.45, 0, 0, 30)
-        Button1.Position = UDim2.new(0.05, 0, 1, -40)
-        Button1.BackgroundColor3 = Theme.Accent
-        Button1.TextColor3 = Color3.new(1, 1, 1)
-        Button1.Text = data.Button1Text or "Yes"
-        Button1.Font = Enum.Font.GothamBold
-        Button1.TextSize = 14
-        Button1.Parent = Frame
-        Instance.new("UICorner", Button1)
+    -- Add message
+    local Message = Instance.new("TextLabel")
+    Message.Size = UDim2.new(0, 230, 0, 60)
+    Message.Position = UDim2.new(0, 60, 0, 20)
+    Message.BackgroundTransparency = 1
+    Message.Text = getgenv().NotificationConfig.Message
+    Message.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Message.TextSize = 16
+    Message.TextWrapped = true
+    Message.TextXAlignment = Enum.TextXAlignment.Left
+    Message.Font = Enum.Font.SourceSansBold
+    Message.Parent = Frame
 
-        Button2 = Instance.new("TextButton")
-        Button2.Size = UDim2.new(0.45, 0, 0, 30)
-        Button2.Position = UDim2.new(0.5, 0, 1, -40)
-        Button2.BackgroundColor3 = Theme.Accent
-        Button2.TextColor3 = Color3.new(1, 1, 1)
-        Button2.Text = data.Button2Text or "No"
-        Button2.Font = Enum.Font.GothamBold
-        Button2.TextSize = 14
-        Button2.Parent = Frame
-        Instance.new("UICorner", Button2)
+    -- Play sound
+    local Sound = Instance.new("Sound")
+    Sound.SoundId = getgenv().NotificationConfig.SoundId
+    Sound.Volume = 0.5
+    Sound.Parent = Frame
+    Sound:Play()
 
-        Button1.MouseButton1Click:Connect(function()
-            if data.OnButton1 then data.OnButton1() end
-            Frame:Destroy()
+    -- Animation: Slide in
+    local tweenIn = TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -320, 0, 50) -- Slide to visible position
+    })
+    tweenIn:Play()
+
+    -- Handle notification type
+    if getgenv().NotificationConfig.Type == "Option" then
+        -- Add Confirm button
+        local ConfirmButton = Instance.new("TextButton")
+        ConfirmButton.Size = UDim2.new(0, 80, 0, 30)
+        ConfirmButton.Position = UDim2.new(0, 60, 0, 60)
+        ConfirmButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        ConfirmButton.Text = "Confirm"
+        ConfirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ConfirmButton.TextSize = 14
+        ConfirmButton.Font = Enum.Font.SourceSansBold
+        ConfirmButton.Parent = Frame
+        local ConfirmCorner = Instance.new("UICorner")
+        ConfirmCorner.CornerRadius = UDim.new(0, 5)
+        ConfirmCorner.Parent = ConfirmButton
+
+        -- Add Cancel button
+        local CancelButton = Instance.new("TextButton")
+        CancelButton.Size = UDim2.new(0, 80, 0, 30)
+        CancelButton.Position = UDim2.new(0, 150, 0, 60)
+        CancelButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        CancelButton.Text = "Cancel"
+        CancelButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        CancelButton.TextSize = 14
+        CancelButton.Font = Enum.Font.SourceSansBold
+        CancelButton.Parent = Frame
+        local CancelCorner = Instance.new("UICorner")
+        CancelCorner.CornerRadius = UDim.new(0, 5)
+        CancelCorner.Parent = CancelButton
+
+        -- Button functionality
+        local function closeNotification()
+            local tweenOut = TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Position = UDim2.new(1, 20, 0, 50) -- Slide out
+            })
+            tweenOut:Play()
+            tweenOut.Completed:Connect(function()
+                ScreenGui:Destroy()
+            end)
+        end
+
+        ConfirmButton.MouseButton1Click:Connect(function()
+            print("Confirm clicked!")
+            closeNotification()
         end)
 
-        Button2.MouseButton1Click:Connect(function()
-            if data.OnButton2 then data.OnButton2() end
-            Frame:Destroy()
+        CancelButton.MouseButton1Click:Connect(function()
+            print("Cancel clicked!")
+            closeNotification()
+        end)
+    else
+        -- Info type: Auto-close after duration
+        wait(getgenv().NotificationConfig.Duration)
+        local tweenOut = TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Position = UDim2.new(1, 20, 0, 50) -- Slide out
+        })
+        tweenOut:Play()
+        tweenOut.Completed:Connect(function()
+            ScreenGui:Destroy()
         end)
     end
-
-    -- Duration Bar
-    local Bar = Instance.new("Frame")
-    Bar.Size = UDim2.new(1, 0, 0, 4)
-    Bar.Position = UDim2.new(0, 0, 1, -2)
-    Bar.BackgroundColor3 = Theme.Accent
-    Bar.BorderSizePixel = 0
-    Bar.Parent = Frame
-    local BarCorner = Instance.new("UICorner", Bar)
-    BarCorner.CornerRadius = UDim.new(1, 0)
-
-    TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -10, 1, -10)
-    }):Play()
-
-    local barTween = TweenService:Create(Bar, TweenInfo.new(Duration, Enum.EasingStyle.Linear), {
-        Size = UDim2.new(0, 0, 0, 4)
-    })
-    barTween:Play()
-
-    task.delay(Duration, function()
-        if Frame and Frame.Parent then
-            TweenService:Create(Frame, TweenInfo.new(0.5), {
-                Position = UDim2.new(1, 310, 1, -10)
-            }):Play()
-            task.wait(0.5)
-            Frame:Destroy()
-        end
-    end)
 end
 
--- Global API
-getgenv().NotifyInfo = function(data)
-    CreateNotification(data, false)
-end
-
-getgenv().NotifyOption = function(data)
-    CreateNotification(data, true)
-end
+-- Execute the notification
+createNotification()
