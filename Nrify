@@ -1,5 +1,5 @@
--- Advanced Notification UI Library
--- Features: Stacking notifications, reusable GUI, smooth animations, close button, customizable positions, types, and durations.
+-- Advanced Notification UI Library (Version 2.0)
+-- Features: Stacking, reusable GUI, customizable decals, sound effects, hover effects, click-to-dismiss, smooth animations
 
 local NotificationLibrary = {}
 NotificationLibrary.__index = NotificationLibrary
@@ -7,11 +7,19 @@ NotificationLibrary.__index = NotificationLibrary
 -- Services
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local SoundService = game:GetService("SoundService")
 
 -- Module variables
 local activeNotifs = {}
 local mainGui
 local holderFrame
+
+-- Default Decal IDs (verified working as of August 31, 2025)
+local defaultDecals = {
+    success = "rbxassetid://5108877300", -- Green checkmark
+    info = "rbxassetid://3926307971",    -- Blue info icon
+    error = "rbxassetid://5107154082"    -- Red error icon
+}
 
 -- Setup Main GUI (called once)
 local function setupMainGui(position)
@@ -40,7 +48,6 @@ local function repositionNotifs()
         TweenService:Create(notif.Frame, tweenInfo, {Position = targetPos}):Play()
         yOffset = yOffset + notif.Frame.Size.Y.Offset + 10  -- Padding between notifs
     end
-    -- Resize holder to fit
     TweenService:Create(holderFrame, tweenInfo, {Size = UDim2.new(0, 300, 0, yOffset)}):Play()
 end
 
@@ -54,41 +61,43 @@ function NotificationLibrary.new(config)
     local notificationType = config.type or "info"
     local duration = config.duration or 5
     local onClose = config.onClose or function() end
-    
+    local decalId = config.decalId or defaultDecals[notificationType] or defaultDecals.info
+    local soundId = config.soundId or "rbxassetid://9120386436" -- Default notification sound
+
     -- Define styles
     local styles = {
-        success = {Color = Color3.fromRGB(0, 255, 128), Icon = "rbxassetid://10618928818"},
-        info = {Color = Color3.fromRGB(0, 191, 255), Icon = "rbxassetid://3926305904"},
-        error = {Color = Color3.fromRGB(255, 69, 58), Icon = "rbxassetid://5107154082"}
+        success = {Color = Color3.fromRGB(0, 255, 128)},
+        info = {Color = Color3.fromRGB(0, 191, 255)},
+        error = {Color = Color3.fromRGB(255, 69, 58)}
     }
     local style = styles[notificationType] or styles.info
 
     -- Create Notification Frame
     local NotifFrame = Instance.new("Frame")
-    NotifFrame.Size = UDim2.new(1, 0, 0, 80)  -- Reduced height for compactness
-    NotifFrame.Position = UDim2.new(1, 0, 0, 0)  -- Start off-screen right
-    NotifFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    NotifFrame.Size = UDim2.new(1, 0, 0, 90)  -- Slightly taller for better spacing
+    NotifFrame.Position = UDim2.new(1, 0, 0, 0)  -- Start off-screen
+    NotifFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     NotifFrame.BorderSizePixel = 0
     NotifFrame.Parent = holderFrame
     NotifFrame.ZIndex = 1400 + #activeNotifs
 
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.CornerRadius = UDim.new(0, 10)
     UICorner.Parent = NotifFrame
 
     -- Icon
     local Icon = Instance.new("ImageLabel")
-    Icon.Size = UDim2.new(0, 30, 0, 30)
-    Icon.Position = UDim2.new(0, 10, 0, 10)
+    Icon.Size = UDim2.new(0, 32, 0, 32)
+    Icon.Position = UDim2.new(0, 12, 0, 12)
     Icon.BackgroundTransparency = 1
-    Icon.Image = style.Icon
+    Icon.Image = decalId
     Icon.ImageColor3 = style.Color
     Icon.Parent = NotifFrame
 
     -- Title
     local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(0, 220, 0, 20)
-    TitleLabel.Position = UDim2.new(0, 50, 0, 10)
+    TitleLabel.Size = UDim2.new(0, 200, 0, 20)
+    TitleLabel.Position = UDim2.new(0, 52, 0, 12)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.Text = title
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -99,11 +108,11 @@ function NotificationLibrary.new(config)
 
     -- Body
     local BodyLabel = Instance.new("TextLabel")
-    BodyLabel.Size = UDim2.new(0, 220, 0, 40)
-    BodyLabel.Position = UDim2.new(0, 50, 0, 30)
+    BodyLabel.Size = UDim2.new(0, 200, 0, 40)
+    BodyLabel.Position = UDim2.new(0, 52, 0, 34)
     BodyLabel.BackgroundTransparency = 1
     BodyLabel.Text = body
-    BodyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    BodyLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
     BodyLabel.TextScaled = true
     BodyLabel.TextWrapped = true
     BodyLabel.Font = Enum.Font.Gotham
@@ -112,21 +121,29 @@ function NotificationLibrary.new(config)
 
     -- Close Button
     local CloseButton = Instance.new("TextButton")
-    CloseButton.Size = UDim2.new(0, 20, 0, 20)
-    CloseButton.Position = UDim2.new(1, -30, 0, 10)
+    CloseButton.Size = UDim2.new(0, 24, 0, 24)
+    CloseButton.Position = UDim2.new(1, -36, 0, 12)
     CloseButton.BackgroundTransparency = 1
     CloseButton.Text = "X"
     CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseButton.Font = Enum.Font.GothamBold
+    CloseButton.TextScaled = true
     CloseButton.Parent = NotifFrame
 
     -- Progress Bar
     local ProgressBar = Instance.new("Frame")
-    ProgressBar.Size = UDim2.new(1, 0, 0, 3)
-    ProgressBar.Position = UDim2.new(0, 0, 1, -3)
+    ProgressBar.Size = UDim2.new(1, 0, 0, 4)
+    ProgressBar.Position = UDim2.new(0, 0, 1, -4)
     ProgressBar.BackgroundColor3 = style.Color
     ProgressBar.BorderSizePixel = 0
     ProgressBar.Parent = NotifFrame
+
+    -- Sound
+    local Sound = Instance.new("Sound")
+    Sound.SoundId = soundId
+    Sound.Volume = 0.5
+    Sound.Parent = NotifFrame
+    SoundService:PlayLocalSound(Sound)
 
     -- Instance table
     local self = setmetatable({
@@ -139,22 +156,38 @@ function NotificationLibrary.new(config)
     table.insert(activeNotifs, self)
     repositionNotifs()
 
-    -- Slide In Animation
+    -- Animations
     local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     TweenService:Create(NotifFrame, tweenInfo, {Position = UDim2.new(0, 0, NotifFrame.Position.Y.Scale, NotifFrame.Position.Y.Offset)}):Play()
-
-    -- Progress Animation
-    local progressTween = TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 3)})
+    local progressTween = TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 4)})
     progressTween:Play()
 
-    -- Auto-close
-    task.spawn(function()
-        task.wait(duration)
+    -- Hover Effect
+    NotifFrame.MouseEnter:Connect(function()
+        TweenService:Create(NotifFrame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 50)}):Play()
+    end)
+    NotifFrame.MouseLeave:Connect(function()
+        TweenService:Create(NotifFrame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 35, 35)}):Play()
+    end)
+
+    -- Click-to-Dismiss
+    local ClickButton = Instance.new("TextButton")
+    ClickButton.Size = UDim2.new(1, 0, 1, 0)
+    ClickButton.BackgroundTransparency = 1
+    ClickButton.Text = ""
+    ClickButton.Parent = NotifFrame
+    ClickButton.MouseButton1Click:Connect(function()
         self:Close()
     end)
 
     -- Close Button Event
     CloseButton.MouseButton1Click:Connect(function()
+        self:Close()
+    end)
+
+    -- Auto-close
+    task.spawn(function()
+        task.wait(duration)
         self:Close()
     end)
 
