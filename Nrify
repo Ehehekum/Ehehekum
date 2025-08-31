@@ -1,0 +1,117 @@
+-- Notification UI Library
+local NotificationLibrary = {}
+
+-- Services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+
+-- UI Setup
+local function createNotificationUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "NotificationGui"
+    ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, 0, 1, 0)
+    Frame.BackgroundTransparency = 1
+    Frame.Parent = ScreenGui
+
+    return Frame
+end
+
+-- Notification Creation
+function NotificationLibrary:CreateNotification(title, body, notificationType, duration)
+    local frame = createNotificationUI()
+    duration = duration or 5 -- Default duration in seconds
+
+    -- Define notification styles based on type
+    local styles = {
+        success = {Color = Color3.fromRGB(0, 255, 128), Icon = "rbxassetid://10618928818"},
+        info = {Color = Color3.fromRGB(0, 191, 255), Icon = "rbxassetid://3926305904"},
+        error = {Color = Color3.fromRGB(255, 69, 58), Icon = "rbxassetid://5107154082"}
+    }
+
+    local style = styles[notificationType] or styles.info
+
+    -- Create Notification Frame
+    local NotifFrame = Instance.new("Frame")
+    NotifFrame.Size = UDim2.new(0, 300, 0, 100)
+    NotifFrame.Position = UDim2.new(1, -320, 0, 20)
+    NotifFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    NotifFrame.BorderSizePixel = 0
+    NotifFrame.Parent = frame
+    NotifFrame.ZIndex = 1400
+
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 8)
+    UICorner.Parent = NotifFrame
+
+    -- Icon
+    local Icon = Instance.new("ImageLabel")
+    Icon.Size = UDim2.new(0, 40, 0, 40)
+    Icon.Position = UDim2.new(0, 10, 0, 10)
+    Icon.BackgroundTransparency = 1
+    Icon.Image = style.Icon
+    Icon.ImageColor3 = style.Color
+    Icon.Parent = NotifFrame
+
+    -- Title
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(0, 230, 0, 20)
+    TitleLabel.Position = UDim2.new(0, 60, 0, 10)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = title or "Notification"
+    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TitleLabel.TextScaled = true
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = NotifFrame
+
+    -- Body
+    local BodyLabel = Instance.new("TextLabel")
+    BodyLabel.Size = UDim2.new(0, 230, 0, 50)
+    BodyLabel.Position = UDim2.new(0, 60, 0, 30)
+    BodyLabel.BackgroundTransparency = 1
+    BodyLabel.Text = body or "This is a notification."
+    BodyLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    BodyLabel.TextScaled = true
+    BodyLabel.TextWrapped = true
+    BodyLabel.Font = Enum.Font.Gotham
+    BodyLabel.TextXAlignment = Enum.TextXAlignment.Left
+    BodyLabel.Parent = NotifFrame
+
+    -- Progress Bar
+    local ProgressBar = Instance.new("Frame")
+    ProgressBar.Size = UDim2.new(1, 0, 0, 4)
+    ProgressBar.Position = UDim2.new(0, 0, 1, -4)
+    ProgressBar.BackgroundColor3 = style.Color
+    ProgressBar.BorderSizePixel = 0
+    ProgressBar.Parent = NotifFrame
+
+    -- Animation
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local slideIn = TweenService:Create(NotifFrame, tweenInfo, {Position = UDim2.new(1, -10, 0, 20)})
+    slideIn:Play()
+
+    -- Progress Bar Animation
+    local progressTween = TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 0, 4)})
+    progressTween:Play()
+
+    -- Destroy after duration
+    task.spawn(function()
+        task.wait(duration)
+        local slideOut = TweenService:Create(NotifFrame, tweenInfo, {Position = UDim2.new(1, 300, 0, 20)})
+        slideOut:Play()
+        slideOut.Completed:Connect(function()
+            NotifFrame:Destroy()
+            if #frame:GetChildren() == 0 then
+                frame.Parent:Destroy()
+            end
+        end)
+    end)
+end
+
+return NotificationLibrary
