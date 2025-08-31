@@ -1,5 +1,5 @@
--- Advanced Roblox UI Library (Version 1.0)
--- Features: Windows, Buttons, Labels, Text Inputs, Toggles, Dropdowns, Themes, Animations, Custom Decals
+-- Advanced Roblox UI Library (Version 2.0)
+-- Features: Windows, Buttons, Labels, Text Inputs, Toggles, Dropdowns, Sliders, Color Pickers, Mobile Support, Animations, Themes, Custom Decals
 
 local UILibrary = {}
 UILibrary.__index = UILibrary
@@ -12,20 +12,29 @@ local SoundService = game:GetService("SoundService")
 
 -- Default Theme
 local defaultTheme = {
-    PrimaryColor = Color3.fromRGB(35, 35, 35),    -- Dark background
-    SecondaryColor = Color3.fromRGB(0, 191, 255), -- Accent color (blue)
+    PrimaryColor = Color3.fromRGB(40, 40, 40),    -- Dark background
+    SecondaryColor = Color3.fromRGB(0, 170, 255), -- Accent color (blue)
     TextColor = Color3.fromRGB(255, 255, 255),
-    HoverColor = Color3.fromRGB(50, 50, 50),
+    HoverColor = Color3.fromRGB(60, 60, 60),
+    DisabledColor = Color3.fromRGB(100, 100, 100),
     Font = Enum.Font.Gotham,
     FontBold = Enum.Font.GothamBold,
-    CornerRadius = UDim.new(0, 8),
-    ClickSound = "rbxassetid://9120386436" -- Verified notification sound
+    CornerRadius = UDim.new(0, 10),
+    ClickSound = "rbxassetid://9120386436", -- Verified notification sound
+    ScaleFactor = 1, -- Adjusted for mobile
 }
 
 -- Default Decal IDs (verified as of August 31, 2025)
 local defaultDecals = {
-    buttonIcon = "rbxassetid://5108877300" -- Green checkmark icon
+    buttonIcon = "rbxassetid://5108877300", -- Green checkmark
+    toggleOn = "rbxassetid://5108877300",   -- Green checkmark for toggle
+    toggleOff = "rbxassetid://5107154082",  -- Red X for toggle
 }
+
+-- Utility: Check if device is mobile
+local function isMobile()
+    return UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+end
 
 -- Main UI Class
 function UILibrary.new(config)
@@ -37,8 +46,10 @@ function UILibrary.new(config)
     self.ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     self.ScreenGui.ResetOnSpawn = false
     self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
+    self.ScreenGui.IgnoreGuiInset = true
+
     self.Theme = config.theme or defaultTheme
+    self.Theme.ScaleFactor = isMobile() and 1.5 or 1 -- Scale up for mobile
     self.Windows = {}
     self.ZIndex = 1000
     
@@ -46,11 +57,11 @@ function UILibrary.new(config)
 end
 
 -- Create a Window
-function UILibrary:CreateWindow(title, size, position, draggable)
+function UILibrary:CreateWindow(title, size, position, draggable, minimizable)
     local window = {}
     window.Frame = Instance.new("Frame")
-    window.Frame.Size = size or UDim2.new(0, 400, 0, 300)
-    window.Frame.Position = position or UDim2.new(0.5, -200, 0.5, -150)
+    window.Frame.Size = size or UDim2.new(0, 400 * self.Theme.ScaleFactor, 0, 300 * self.Theme.ScaleFactor)
+    window.Frame.Position = position or UDim2.new(0.5, -200 * self.Theme.ScaleFactor, 0.5, -150 * self.Theme.ScaleFactor)
     window.Frame.BackgroundColor3 = self.Theme.PrimaryColor
     window.Frame.BorderSizePixel = 0
     window.Frame.Parent = self.ScreenGui
@@ -62,15 +73,15 @@ function UILibrary:CreateWindow(title, size, position, draggable)
     corner.Parent = window.Frame
 
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.Size = UDim2.new(1, 0, 0, 40 * self.Theme.ScaleFactor)
     titleBar.BackgroundColor3 = self.Theme.SecondaryColor
     titleBar.BorderSizePixel = 0
     titleBar.Parent = window.Frame
     titleBar.ZIndex = window.Frame.ZIndex + 1
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0, 200, 1, 0)
-    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.Size = UDim2.new(0, 200 * self.Theme.ScaleFactor, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title or "Window"
     titleLabel.TextColor3 = self.Theme.TextColor
@@ -80,8 +91,8 @@ function UILibrary:CreateWindow(title, size, position, draggable)
     titleLabel.Parent = titleBar
 
     local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 24, 0, 24)
-    closeButton.Position = UDim2.new(1, -30, 0, 3)
+    closeButton.Size = UDim2.new(0, 32 * self.Theme.ScaleFactor, 0, 32 * self.Theme.ScaleFactor)
+    closeButton.Position = UDim2.new(1, -40 * self.Theme.ScaleFactor, 0, 4 * self.Theme.ScaleFactor)
     closeButton.BackgroundTransparency = 1
     closeButton.Text = "X"
     closeButton.TextColor3 = self.Theme.TextColor
@@ -89,23 +100,42 @@ function UILibrary:CreateWindow(title, size, position, draggable)
     closeButton.TextScaled = true
     closeButton.Parent = titleBar
 
-    -- Draggable
+    local minimizeButton
+    if minimizable then
+        minimizeButton = Instance.new("TextButton")
+        minimizeButton.Size = UDim2.new(0, 32 * self.Theme.ScaleFactor, 0, 32 * self.Theme.ScaleFactor)
+        minimizeButton.Position = UDim2.new(1, -80 * self.Theme.ScaleFactor, 0, 4 * self.Theme.ScaleFactor)
+        minimizeButton.BackgroundTransparency = 1
+        minimizeButton.Text = "-"
+        minimizeButton.TextColor3 = self.Theme.TextColor
+        minimizeButton.Font = self.Theme.FontBold
+        minimizeButton.TextScaled = true
+        minimizeButton.Parent = titleBar
+    end
+
+    -- Draggable (supports touch for mobile)
     if draggable then
         local dragging, dragStart, startPos
+        local function startDrag(input)
+            dragging = true
+            dragStart = input.Position
+            startPos = window.Frame.Position
+        end
+        local function endDrag()
+            dragging = false
+        end
         titleBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                dragStart = input.Position
-                startPos = window.Frame.Position
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                startDrag(input)
             end
         end)
         titleBar.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                endDrag()
             end
         end)
         UserInputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
                 local delta = input.Position - dragStart
                 window.Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             end
@@ -122,8 +152,26 @@ function UILibrary:CreateWindow(title, size, position, draggable)
         SoundService:PlayLocalSound(sound)
     end)
 
+    -- Minimize Button
+    if minimizable then
+        local minimized = false
+        minimizeButton.MouseButton1Click:Connect(function()
+            minimized = not minimized
+            local targetSize = minimized and UDim2.new(window.Frame.Size.X.Scale, window.Frame.Size.X.Offset, 0, 40 * self.Theme.ScaleFactor) or size
+            TweenService:Create(window.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = targetSize}):Play()
+            for _, element in ipairs(window.Elements) do
+                element.Visible = not minimized
+            end
+            minimizeButton.Text = minimized and "+" or "-"
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = window.Frame
+            SoundService:PlayLocalSound(sound)
+        end)
+    end
+
     window.Elements = {}
-    window.ElementOffset = 40 -- Start elements below title bar
+    window.ElementOffset = 50 * self.Theme.ScaleFactor -- Start below title bar
     table.insert(self.Windows, window)
     return window
 end
@@ -131,8 +179,8 @@ end
 -- Create a Button
 function UILibrary:CreateButton(window, text, callback, size, iconId)
     local buttonFrame = Instance.new("TextButton")
-    buttonFrame.Size = size or UDim2.new(0, 200, 0, 40)
-    buttonFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    buttonFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
+    buttonFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
     buttonFrame.BackgroundColor3 = self.Theme.SecondaryColor
     buttonFrame.Text = text or "Button"
     buttonFrame.TextColor3 = self.Theme.TextColor
@@ -147,8 +195,8 @@ function UILibrary:CreateButton(window, text, callback, size, iconId)
 
     if iconId or defaultDecals.buttonIcon then
         local icon = Instance.new("ImageLabel")
-        icon.Size = UDim2.new(0, 24, 0, 24)
-        icon.Position = UDim2.new(0, 10, 0, 8)
+        icon.Size = UDim2.new(0, 24 * self.Theme.ScaleFactor, 0, 24 * self.Theme.ScaleFactor)
+        icon.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, 8 * self.Theme.ScaleFactor)
         icon.BackgroundTransparency = 1
         icon.Image = iconId or defaultDecals.buttonIcon
         icon.ImageColor3 = self.Theme.TextColor
@@ -157,24 +205,25 @@ function UILibrary:CreateButton(window, text, callback, size, iconId)
         buttonFrame.Text = " " .. buttonFrame.Text
     end
 
-    -- Hover Effect
+    -- Hover and Click Effects
     buttonFrame.MouseEnter:Connect(function()
         TweenService:Create(buttonFrame, TweenInfo.new(0.2), {BackgroundColor3 = self.Theme.HoverColor}):Play()
     end)
     buttonFrame.MouseLeave:Connect(function()
         TweenService:Create(buttonFrame, TweenInfo.new(0.2), {BackgroundColor3 = self.Theme.SecondaryColor}):Play()
     end)
-
-    -- Click Event
     buttonFrame.MouseButton1Click:Connect(function()
         callback()
         local sound = Instance.new("Sound")
         sound.SoundId = self.Theme.ClickSound
         sound.Parent = buttonFrame
         SoundService:PlayLocalSound(sound)
+        TweenService:Create(buttonFrame, TweenInfo.new(0.1), {Size = buttonFrame.Size + UDim2.new(0, -5 * self.Theme.ScaleFactor, 0, -5 * self.Theme.ScaleFactor)}):Play()
+        task.wait(0.1)
+        TweenService:Create(buttonFrame, TweenInfo.new(0.1), {Size = buttonFrame.Size}):Play()
     end)
 
-    window.ElementOffset = window.ElementOffset + buttonFrame.Size.Y.Offset + 10
+    window.ElementOffset = window.ElementOffset + buttonFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
     table.insert(window.Elements, buttonFrame)
     return buttonFrame
 end
@@ -182,8 +231,8 @@ end
 -- Create a Label
 function UILibrary:CreateLabel(window, text, size)
     local label = Instance.new("TextLabel")
-    label.Size = size or UDim2.new(0, 200, 0, 30)
-    label.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    label.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 30 * self.Theme.ScaleFactor)
+    label.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
     label.BackgroundTransparency = 1
     label.Text = text or "Label"
     label.TextColor3 = self.Theme.TextColor
@@ -193,7 +242,7 @@ function UILibrary:CreateLabel(window, text, size)
     label.Parent = window.Frame
     label.ZIndex = window.Frame.ZIndex + 2
 
-    window.ElementOffset = window.ElementOffset + label.Size.Y.Offset + 10
+    window.ElementOffset = window.ElementOffset + label.Size.Y.Offset + 10 * self.Theme.ScaleFactor
     table.insert(window.Elements, label)
     return label
 end
@@ -201,8 +250,8 @@ end
 -- Create a Text Input
 function UILibrary:CreateTextInput(window, placeholder, callback, size)
     local inputFrame = Instance.new("Frame")
-    inputFrame.Size = size or UDim2.new(0, 200, 0, 40)
-    inputFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    inputFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
+    inputFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
     inputFrame.BackgroundColor3 = self.Theme.PrimaryColor
     inputFrame.BorderSizePixel = 0
     inputFrame.Parent = window.Frame
@@ -213,10 +262,10 @@ function UILibrary:CreateTextInput(window, placeholder, callback, size)
     corner.Parent = inputFrame
 
     local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(1, -10, 1, -10)
-    textBox.Position = UDim2.new(0, 5, 0, 5)
+    textBox.Size = UDim2.new(1, -10 * self.Theme.ScaleFactor, 1, -10 * self.Theme.ScaleFactor)
+    textBox.Position = UDim2.new(0, 5 * self.Theme.ScaleFactor, 0, 5 * self.Theme.ScaleFactor)
     textBox.BackgroundTransparency = 1
-    textBox.Text = placeholder or ""
+    textBox.Text = ""
     textBox.PlaceholderText = placeholder or "Enter text..."
     textBox.TextColor3 = self.Theme.TextColor
     textBox.TextScaled = true
@@ -233,22 +282,22 @@ function UILibrary:CreateTextInput(window, placeholder, callback, size)
         end
     end)
 
-    window.ElementOffset = window.ElementOffset + inputFrame.Size.Y.Offset + 10
+    window.ElementOffset = window.ElementOffset + inputFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
     table.insert(window.Elements, inputFrame)
     return inputFrame
 end
 
 -- Create a Toggle
-function UILibrary:CreateToggle(window, text, callback, size)
+function UILibrary:CreateToggle(window, text, callback, size, iconOn, iconOff)
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = size or UDim2.new(0, 200, 0, 40)
-    toggleFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    toggleFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
+    toggleFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
     toggleFrame.BackgroundTransparency = 1
     toggleFrame.Parent = window.Frame
     toggleFrame.ZIndex = window.Frame.ZIndex + 2
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 150, 1, 0)
+    label.Size = UDim2.new(0, 300 * self.Theme.ScaleFactor, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = text or "Toggle"
     label.TextColor3 = self.Theme.TextColor
@@ -257,11 +306,11 @@ function UILibrary:CreateToggle(window, text, callback, size)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggleFrame
 
-    local toggleButton = Instance.new("TextButton")
-    toggleButton.Size = UDim2.new(0, 40, 0, 20)
-    toggleButton.Position = UDim2.new(1, -40, 0, 10)
-    toggleButton.BackgroundColor3 = self.Theme.SecondaryColor
-    toggleButton.Text = ""
+    local toggleButton = Instance.new("ImageButton")
+    toggleButton.Size = UDim2.new(0, 40 * self.Theme.ScaleFactor, 0, 20 * self.Theme.ScaleFactor)
+    toggleButton.Position = UDim2.new(1, -40 * self.Theme.ScaleFactor, 0, 10 * self.Theme.ScaleFactor)
+    toggleButton.BackgroundColor3 = self.Theme.DisabledColor
+    toggleButton.Image = iconOff or defaultDecals.toggleOff
     toggleButton.Parent = toggleFrame
 
     local corner = Instance.new("UICorner")
@@ -271,7 +320,155 @@ function UILibrary:CreateToggle(window, text, callback, size)
     local state = false
     toggleButton.MouseButton1Click:Connect(function()
         state = not state
-        TweenService:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = state and self.Theme.SecondaryColor or self.Theme.HoverColor}):Play()
+        toggleButton.BackgroundColor3 = state and self.Theme.SecondaryColor or self.Theme.DisabledColor
+        toggleButton.Image = state and (iconOn or defaultDecals.toggleOn) or (iconOff or defaultDecals.toggleOff)
+        callback(state)
+        local sound = Instance.new("Sound")
+        sound.SoundId = self.Theme.ClickSound
+        sound.Parent = toggleFrame
+        SoundService:PlayLocalSound(sound)
+    end)
+
+    window.ElementOffset = window.ElementOffset + toggleFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
+    table.insert(window.Elements, toggleFrame)
+    return toggleFrame
+end
+
+-- Create a Dropdown
+function UILibrary:CreateDropdown(window, text, options, callback, size)
+    local dropdownFrame = Instance.new("Frame")
+    dropdownFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
+    dropdownFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    dropdownFrame.BackgroundColor3 = self.Theme.PrimaryColor
+    dropdownFrame.Parent = window.Frame
+    dropdownFrame.ZIndex = window.Frame.ZIndex + 2
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Theme.CornerRadius
+    corner.Parent = dropdownFrame
+
+    local dropdownButton = Instance.new("TextButton")
+    dropdownButton.Size = UDim2.new(1, 0, 1, 0)
+    dropdownButton.BackgroundTransparency = 1
+    dropdownButton.Text = text or "Select an option"
+    dropdownButton.TextColor3 = self.Theme.TextColor
+    dropdownButton.TextScaled = true
+    dropdownButton.Font = self.Theme.Font
+    dropdownButton.Parent = dropdownFrame
+
+    local dropdownList = Instance.new("Frame")
+    dropdownList.Size = UDim2.new(1, 0, 0, 0)
+    dropdownList.Position = UDim2.new(0, 0, 1, 5 * self.Theme.ScaleFactor)
+    dropdownList.BackgroundColor3 = self.Theme.PrimaryColor
+    dropdownList.BorderSizePixel = 0
+    dropdownList.Visible = false
+    dropdownList.Parent = dropdownFrame
+    dropdownList.ZIndex = dropdownFrame.ZIndex + 1
+
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = self.Theme.CornerRadius
+    listCorner.Parent = dropdownList
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = dropdownList
+
+    local optionButtons = {}
+    for i, option in ipairs(options or {}) do
+        local optionButton = Instance.new("TextButton")
+        optionButton.Size = UDim2.new(1, 0, 0, 30 * self.Theme.ScaleFactor)
+        optionButton.BackgroundColor3 = self.Theme.SecondaryColor
+        optionButton.Text = option
+        optionButton.TextColor3 = self.Theme.TextColor
+        optionButton.TextScaled = true
+        optionButton.Font = self.Theme.Font
+        optionButton.Parent = dropdownList
+        optionButton.ZIndex = dropdownList.ZIndex + 1
+
+        local optionCorner = Instance.new("UICorner")
+        optionCorner.CornerRadius = self.Theme.CornerRadius
+        optionCorner.Parent = optionButton
+
+        optionButton.MouseButton1Click:Connect(function()
+            dropdownButton.Text = option
+            dropdownList.Visible = false
+            TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
+            callback(option)
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = dropdownFrame
+            SoundService:PlayLocalSound(sound)
+        end)
+
+        table.insert(optionButtons, optionButton)
+    end
+
+    dropdownButton.MouseButton1Click:Connect(function()
+        dropdownList.Visible = not dropdownList.Visible
+        local listHeight = #optionButtons * 30 * self.Theme.ScaleFactor + 10 * self.Theme.ScaleFactor
+        TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, dropdownList.Visible and listHeight or 0)}):Play()
+        local sound = Instance.new("Sound")
+        sound.SoundId = self.Theme.ClickSound
+        sound.Parent = dropdownFrame
+        SoundService:PlayLocalSound(sound)
+    end)
+
+    window.ElementOffset = window.ElementOffset + dropdownFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
+    table.insert(window.Elements, dropdownFrame)
+    return dropdownFrame
+end
+
+-- Create a Slider
+function UILibrary:CreateSlider(window, text, min, max, default, callback, size)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 50 * self.Theme.ScaleFactor)
+    sliderFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.Parent = window.Frame
+    sliderFrame.ZIndex = window.Frame.ZIndex + 2
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 300 * self.Theme.ScaleFactor, 0, 20 * self.Theme.ScaleFactor)
+    label.BackgroundTransparency = 1
+    label.Text = text or "Slider: " .. tostring(default or min)
+    label.TextColor3 = self.Theme.TextColor
+    label.TextScaled = true
+    label.Font = self.Theme.Font
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = sliderFrame
+
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, 0, 0, 10 * self.Theme.ScaleFactor)
+    sliderBar.Position = UDim2.new(0, 0, 0, 30 * self.Theme.ScaleFactor)
+    sliderBar.BackgroundColor3 = self.Theme.DisabledColor
+    sliderBar.Parent = sliderFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = sliderBar
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = self.Theme.SecondaryColor
+    fill.Parent = sliderBar
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 5)
+    fillCorner.Parent = fill
+
+    local knob = Instance.new("TextButton")
+    knob.Size = UDim2.new(0, 20 * self.Theme.ScaleFactor, 0, 20 * self.Theme.ScaleFactor)
+    knob.Position = UDim2.new((default - min) / (max - min), -10 * self.Theme.ScaleFactor, 0, -5 * self.Theme.ScaleFactor)
+    knob.BackgroundColor3 = self.Theme.TextColor
+    knob.Text = ""
+    knob.Parent = sliderBar
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(0, 10)
+    knobCorner.Parent = knob
+
+    local function updateSlider(input)
+        local delta = (input.Position.X - sliderBar.Absolute:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = state and self.Theme.SecondaryColor or self.Theme.HoverColor}):Play()
         callback(state)
         local sound = Instance.new("Sound")
         sound.SoundId = self.Theme.ClickSound
