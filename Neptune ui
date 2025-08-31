@@ -1,5 +1,5 @@
 -- Advanced Roblox UI Library (Version 2.0)
--- Features: Windows, Buttons, Labels, Text Inputs, Toggles, Dropdowns, Sliders, Color Pickers, Mobile Support, Animations, Themes, Custom Decals
+-- Features: Windows, Buttons, Labels, Text Inputs, Toggles, Dropdowns, Sliders, Color Pickers, Gradients, Mobile Support, Animations
 
 local UILibrary = {}
 UILibrary.__index = UILibrary
@@ -12,29 +12,27 @@ local SoundService = game:GetService("SoundService")
 
 -- Default Theme
 local defaultTheme = {
-    PrimaryColor = Color3.fromRGB(40, 40, 40),    -- Dark background
-    SecondaryColor = Color3.fromRGB(0, 170, 255), -- Accent color (blue)
+    PrimaryColor = Color3.fromRGB(40, 40, 40),
+    SecondaryColor = Color3.fromRGB(0, 170, 255),
     TextColor = Color3.fromRGB(255, 255, 255),
     HoverColor = Color3.fromRGB(60, 60, 60),
-    DisabledColor = Color3.fromRGB(100, 100, 100),
+    Gradient = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 40)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 60, 60))
+    }),
     Font = Enum.Font.Gotham,
     FontBold = Enum.Font.GothamBold,
     CornerRadius = UDim.new(0, 10),
     ClickSound = "rbxassetid://9120386436", -- Verified notification sound
-    ScaleFactor = 1, -- Adjusted for mobile
+    MobileScale = 1.2 -- Scale for mobile touch targets
 }
 
 -- Default Decal IDs (verified as of August 31, 2025)
 local defaultDecals = {
     buttonIcon = "rbxassetid://5108877300", -- Green checkmark
-    toggleOn = "rbxassetid://5108877300",   -- Green checkmark for toggle
-    toggleOff = "rbxassetid://5107154082",  -- Red X for toggle
+    toggleOn = "rbxassetid://5108877300",  -- Green checkmark
+    toggleOff = "rbxassetid://5107154082"  -- Red X
 }
-
--- Utility: Check if device is mobile
-local function isMobile()
-    return UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-end
 
 -- Main UI Class
 function UILibrary.new(config)
@@ -46,42 +44,47 @@ function UILibrary.new(config)
     self.ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     self.ScreenGui.ResetOnSpawn = false
     self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    self.ScreenGui.IgnoreGuiInset = true
-
+    self.ScreenGui.IgnoreGuiInset = true -- Better mobile compatibility
+    
     self.Theme = config.theme or defaultTheme
-    self.Theme.ScaleFactor = isMobile() and 1.5 or 1 -- Scale up for mobile
     self.Windows = {}
     self.ZIndex = 1000
+    self.IsMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
     
     return self
 end
 
 -- Create a Window
-function UILibrary:CreateWindow(title, size, position, draggable, minimizable)
+function UILibrary:CreateWindow(title, size, position, draggable)
     local window = {}
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
     window.Frame = Instance.new("Frame")
-    window.Frame.Size = size or UDim2.new(0, 400 * self.Theme.ScaleFactor, 0, 300 * self.Theme.ScaleFactor)
-    window.Frame.Position = position or UDim2.new(0.5, -200 * self.Theme.ScaleFactor, 0.5, -150 * self.Theme.ScaleFactor)
+    window.Frame.Size = size or UDim2.new(0, 400 * scale, 0, 300 * scale)
+    window.Frame.Position = position or UDim2.new(0.5, -(200 * scale), 0.5, -(150 * scale))
     window.Frame.BackgroundColor3 = self.Theme.PrimaryColor
     window.Frame.BorderSizePixel = 0
     window.Frame.Parent = self.ScreenGui
     window.Frame.ZIndex = self.ZIndex
     self.ZIndex = self.ZIndex + 10
 
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = self.Theme.Gradient
+    gradient.Parent = window.Frame
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = self.Theme.CornerRadius
     corner.Parent = window.Frame
 
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 40 * self.Theme.ScaleFactor)
+    titleBar.Size = UDim2.new(1, 0, 0, 30 * scale)
     titleBar.BackgroundColor3 = self.Theme.SecondaryColor
     titleBar.BorderSizePixel = 0
     titleBar.Parent = window.Frame
     titleBar.ZIndex = window.Frame.ZIndex + 1
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0, 200 * self.Theme.ScaleFactor, 1, 0)
-    titleLabel.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, 0)
+    titleLabel.Size = UDim2.new(0, 200 * scale, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10 * scale, 0, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title or "Window"
     titleLabel.TextColor3 = self.Theme.TextColor
@@ -91,8 +94,8 @@ function UILibrary:CreateWindow(title, size, position, draggable, minimizable)
     titleLabel.Parent = titleBar
 
     local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 32 * self.Theme.ScaleFactor, 0, 32 * self.Theme.ScaleFactor)
-    closeButton.Position = UDim2.new(1, -40 * self.Theme.ScaleFactor, 0, 4 * self.Theme.ScaleFactor)
+    closeButton.Size = UDim2.new(0, 24 * scale, 0, 24 * scale)
+    closeButton.Position = UDim2.new(1, -(30 * scale), 0, 3 * scale)
     closeButton.BackgroundTransparency = 1
     closeButton.Text = "X"
     closeButton.TextColor3 = self.Theme.TextColor
@@ -100,42 +103,23 @@ function UILibrary:CreateWindow(title, size, position, draggable, minimizable)
     closeButton.TextScaled = true
     closeButton.Parent = titleBar
 
-    local minimizeButton
-    if minimizable then
-        minimizeButton = Instance.new("TextButton")
-        minimizeButton.Size = UDim2.new(0, 32 * self.Theme.ScaleFactor, 0, 32 * self.Theme.ScaleFactor)
-        minimizeButton.Position = UDim2.new(1, -80 * self.Theme.ScaleFactor, 0, 4 * self.Theme.ScaleFactor)
-        minimizeButton.BackgroundTransparency = 1
-        minimizeButton.Text = "-"
-        minimizeButton.TextColor3 = self.Theme.TextColor
-        minimizeButton.Font = self.Theme.FontBold
-        minimizeButton.TextScaled = true
-        minimizeButton.Parent = titleBar
-    end
-
-    -- Draggable (supports touch for mobile)
+    -- Draggable (supports touch and mouse)
     if draggable then
         local dragging, dragStart, startPos
-        local function startDrag(input)
-            dragging = true
-            dragStart = input.Position
-            startPos = window.Frame.Position
-        end
-        local function endDrag()
-            dragging = false
-        end
         titleBar.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                startDrag(input)
+                dragging = true
+                dragStart = input.Position
+                startPos = window.Frame.Position
             end
         end)
         titleBar.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                endDrag()
+                dragging = false
             end
         end)
         UserInputService.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 local delta = input.Position - dragStart
                 window.Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             end
@@ -144,43 +128,39 @@ function UILibrary:CreateWindow(title, size, position, draggable, minimizable)
 
     -- Close Button
     closeButton.MouseButton1Click:Connect(function()
-        window.Frame:Destroy()
-        self.Windows[window] = nil
+        local tween = TweenService:Create(window.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 1})
+        tween:Play()
+        for _, child in ipairs(window.Frame:GetDescendants()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") then
+                TweenService:Create(child, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+            elseif child:IsA("ImageLabel") then
+                TweenService:Create(child, TweenInfo.new(0.3), {ImageTransparency = 1}):Play()
+            elseif child:IsA("Frame") then
+                TweenService:Create(child, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+            end
+        end
+        tween.Completed:Connect(function()
+            window.Frame:Destroy()
+            self.Windows[window] = nil
+        end)
         local sound = Instance.new("Sound")
         sound.SoundId = self.Theme.ClickSound
         sound.Parent = window.Frame
         SoundService:PlayLocalSound(sound)
     end)
 
-    -- Minimize Button
-    if minimizable then
-        local minimized = false
-        minimizeButton.MouseButton1Click:Connect(function()
-            minimized = not minimized
-            local targetSize = minimized and UDim2.new(window.Frame.Size.X.Scale, window.Frame.Size.X.Offset, 0, 40 * self.Theme.ScaleFactor) or size
-            TweenService:Create(window.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = targetSize}):Play()
-            for _, element in ipairs(window.Elements) do
-                element.Visible = not minimized
-            end
-            minimizeButton.Text = minimized and "+" or "-"
-            local sound = Instance.new("Sound")
-            sound.SoundId = self.Theme.ClickSound
-            sound.Parent = window.Frame
-            SoundService:PlayLocalSound(sound)
-        end)
-    end
-
     window.Elements = {}
-    window.ElementOffset = 50 * self.Theme.ScaleFactor -- Start below title bar
+    window.ElementOffset = 40 * scale
     table.insert(self.Windows, window)
     return window
 end
 
 -- Create a Button
 function UILibrary:CreateButton(window, text, callback, size, iconId)
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
     local buttonFrame = Instance.new("TextButton")
-    buttonFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
-    buttonFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    buttonFrame.Size = size or UDim2.new(0, 380 * scale, 0, 40 * scale)
+    buttonFrame.Position = UDim2.new(0, 10 * scale, 0, window.ElementOffset)
     buttonFrame.BackgroundColor3 = self.Theme.SecondaryColor
     buttonFrame.Text = text or "Button"
     buttonFrame.TextColor3 = self.Theme.TextColor
@@ -189,14 +169,18 @@ function UILibrary:CreateButton(window, text, callback, size, iconId)
     buttonFrame.Parent = window.Frame
     buttonFrame.ZIndex = window.Frame.ZIndex + 2
 
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = self.Theme.Gradient
+    gradient.Parent = buttonFrame
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = self.Theme.CornerRadius
     corner.Parent = buttonFrame
 
     if iconId or defaultDecals.buttonIcon then
         local icon = Instance.new("ImageLabel")
-        icon.Size = UDim2.new(0, 24 * self.Theme.ScaleFactor, 0, 24 * self.Theme.ScaleFactor)
-        icon.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, 8 * self.Theme.ScaleFactor)
+        icon.Size = UDim2.new(0, 24 * scale, 0, 24 * scale)
+        icon.Position = UDim2.new(0, 10 * scale, 0, 8 * scale)
         icon.BackgroundTransparency = 1
         icon.Image = iconId or defaultDecals.buttonIcon
         icon.ImageColor3 = self.Theme.TextColor
@@ -205,34 +189,36 @@ function UILibrary:CreateButton(window, text, callback, size, iconId)
         buttonFrame.Text = " " .. buttonFrame.Text
     end
 
-    -- Hover and Click Effects
+    -- Hover Effect
     buttonFrame.MouseEnter:Connect(function()
         TweenService:Create(buttonFrame, TweenInfo.new(0.2), {BackgroundColor3 = self.Theme.HoverColor}):Play()
     end)
     buttonFrame.MouseLeave:Connect(function()
         TweenService:Create(buttonFrame, TweenInfo.new(0.2), {BackgroundColor3 = self.Theme.SecondaryColor}):Play()
     end)
-    buttonFrame.MouseButton1Click:Connect(function()
-        callback()
-        local sound = Instance.new("Sound")
-        sound.SoundId = self.Theme.ClickSound
-        sound.Parent = buttonFrame
-        SoundService:PlayLocalSound(sound)
-        TweenService:Create(buttonFrame, TweenInfo.new(0.1), {Size = buttonFrame.Size + UDim2.new(0, -5 * self.Theme.ScaleFactor, 0, -5 * self.Theme.ScaleFactor)}):Play()
-        task.wait(0.1)
-        TweenService:Create(buttonFrame, TweenInfo.new(0.1), {Size = buttonFrame.Size}):Play()
+
+    -- Click Event (supports touch)
+    buttonFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            callback()
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = buttonFrame
+            SoundService:PlayLocalSound(sound)
+        end
     end)
 
-    window.ElementOffset = window.ElementOffset + buttonFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
+    window.ElementOffset = window.ElementOffset + buttonFrame.Size.Y.Offset + 10 * scale
     table.insert(window.Elements, buttonFrame)
     return buttonFrame
 end
 
 -- Create a Label
 function UILibrary:CreateLabel(window, text, size)
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
     local label = Instance.new("TextLabel")
-    label.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 30 * self.Theme.ScaleFactor)
-    label.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    label.Size = size or UDim2.new(0, 380 * scale, 0, 30 * scale)
+    label.Position = UDim2.new(0, 10 * scale, 0, window.ElementOffset)
     label.BackgroundTransparency = 1
     label.Text = text or "Label"
     label.TextColor3 = self.Theme.TextColor
@@ -242,28 +228,33 @@ function UILibrary:CreateLabel(window, text, size)
     label.Parent = window.Frame
     label.ZIndex = window.Frame.ZIndex + 2
 
-    window.ElementOffset = window.ElementOffset + label.Size.Y.Offset + 10 * self.Theme.ScaleFactor
+    window.ElementOffset = window.ElementOffset + label.Size.Y.Offset + 10 * scale
     table.insert(window.Elements, label)
     return label
 end
 
 -- Create a Text Input
 function UILibrary:CreateTextInput(window, placeholder, callback, size)
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
     local inputFrame = Instance.new("Frame")
-    inputFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
-    inputFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    inputFrame.Size = size or UDim2.new(0, 380 * scale, 0, 40 * scale)
+    inputFrame.Position = UDim2.new(0, 10 * scale, 0, window.ElementOffset)
     inputFrame.BackgroundColor3 = self.Theme.PrimaryColor
     inputFrame.BorderSizePixel = 0
     inputFrame.Parent = window.Frame
     inputFrame.ZIndex = window.Frame.ZIndex + 2
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = self.Theme.Gradient
+    gradient.Parent = inputFrame
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = self.Theme.CornerRadius
     corner.Parent = inputFrame
 
     local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(1, -10 * self.Theme.ScaleFactor, 1, -10 * self.Theme.ScaleFactor)
-    textBox.Position = UDim2.new(0, 5 * self.Theme.ScaleFactor, 0, 5 * self.Theme.ScaleFactor)
+    textBox.Size = UDim2.new(1, -10 * scale, 1, -10 * scale)
+    textBox.Position = UDim2.new(0, 5 * scale, 0, 5 * scale)
     textBox.BackgroundTransparency = 1
     textBox.Text = ""
     textBox.PlaceholderText = placeholder or "Enter text..."
@@ -282,22 +273,23 @@ function UILibrary:CreateTextInput(window, placeholder, callback, size)
         end
     end)
 
-    window.ElementOffset = window.ElementOffset + inputFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
+    window.ElementOffset = window.ElementOffset + inputFrame.Size.Y.Offset + 10 * scale
     table.insert(window.Elements, inputFrame)
     return inputFrame
 end
 
 -- Create a Toggle
-function UILibrary:CreateToggle(window, text, callback, size, iconOn, iconOff)
+function UILibrary:CreateToggle(window, text, callback, size, onIcon, offIcon)
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
     local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
-    toggleFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    toggleFrame.Size = size or UDim2.new(0, 380 * scale, 0, 40 * scale)
+    toggleFrame.Position = UDim2.new(0, 10 * scale, 0, window.ElementOffset)
     toggleFrame.BackgroundTransparency = 1
     toggleFrame.Parent = window.Frame
     toggleFrame.ZIndex = window.Frame.ZIndex + 2
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 300 * self.Theme.ScaleFactor, 1, 0)
+    label.Size = UDim2.new(0, 300 * scale, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = text or "Toggle"
     label.TextColor3 = self.Theme.TextColor
@@ -306,42 +298,57 @@ function UILibrary:CreateToggle(window, text, callback, size, iconOn, iconOff)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = toggleFrame
 
-    local toggleButton = Instance.new("ImageButton")
-    toggleButton.Size = UDim2.new(0, 40 * self.Theme.ScaleFactor, 0, 20 * self.Theme.ScaleFactor)
-    toggleButton.Position = UDim2.new(1, -40 * self.Theme.ScaleFactor, 0, 10 * self.Theme.ScaleFactor)
-    toggleButton.BackgroundColor3 = self.Theme.DisabledColor
-    toggleButton.Image = iconOff or defaultDecals.toggleOff
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 40 * scale, 0, 20 * scale)
+    toggleButton.Position = UDim2.new(1, -(50 * scale), 0, 10 * scale)
+    toggleButton.BackgroundColor3 = self.Theme.SecondaryColor
+    toggleButton.Text = ""
     toggleButton.Parent = toggleFrame
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 10)
     corner.Parent = toggleButton
 
+    local toggleIcon = Instance.new("ImageLabel")
+    toggleIcon.Size = UDim2.new(0, 16 * scale, 0, 16 * scale)
+    toggleIcon.Position = UDim2.new(0, 12 * scale, 0, 2 * scale)
+    toggleIcon.BackgroundTransparency = 1
+    toggleIcon.Image = offIcon or defaultDecals.toggleOff
+    toggleIcon.ImageColor3 = self.Theme.TextColor
+    toggleIcon.Parent = toggleButton
+
     local state = false
-    toggleButton.MouseButton1Click:Connect(function()
-        state = not state
-        toggleButton.BackgroundColor3 = state and self.Theme.SecondaryColor or self.Theme.DisabledColor
-        toggleButton.Image = state and (iconOn or defaultDecals.toggleOn) or (iconOff or defaultDecals.toggleOff)
-        callback(state)
-        local sound = Instance.new("Sound")
-        sound.SoundId = self.Theme.ClickSound
-        sound.Parent = toggleFrame
-        SoundService:PlayLocalSound(sound)
+    toggleButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            state = not state
+            TweenService:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = state and self.Theme.SecondaryColor or self.Theme.HoverColor}):Play()
+            toggleIcon.Image = state and (onIcon or defaultDecals.toggleOn) or (offIcon or defaultDecals.toggleOff)
+            callback(state)
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = toggleFrame
+            SoundService:PlayLocalSound(sound)
+        end
     end)
 
-    window.ElementOffset = window.ElementOffset + toggleFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
+    window.ElementOffset = window.ElementOffset + toggleFrame.Size.Y.Offset + 10 * scale
     table.insert(window.Elements, toggleFrame)
     return toggleFrame
 end
 
 -- Create a Dropdown
 function UILibrary:CreateDropdown(window, text, options, callback, size)
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
     local dropdownFrame = Instance.new("Frame")
-    dropdownFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 40 * self.Theme.ScaleFactor)
-    dropdownFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    dropdownFrame.Size = size or UDim2.new(0, 380 * scale, 0, 40 * scale)
+    dropdownFrame.Position = UDim2.new(0, 10 * scale, 0, window.ElementOffset)
     dropdownFrame.BackgroundColor3 = self.Theme.PrimaryColor
     dropdownFrame.Parent = window.Frame
     dropdownFrame.ZIndex = window.Frame.ZIndex + 2
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = self.Theme.Gradient
+    gradient.Parent = dropdownFrame
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = self.Theme.CornerRadius
@@ -358,16 +365,20 @@ function UILibrary:CreateDropdown(window, text, options, callback, size)
 
     local dropdownList = Instance.new("Frame")
     dropdownList.Size = UDim2.new(1, 0, 0, 0)
-    dropdownList.Position = UDim2.new(0, 0, 1, 5 * self.Theme.ScaleFactor)
+    dropdownList.Position = UDim2.new(0, 0, 1, 5 * scale)
     dropdownList.BackgroundColor3 = self.Theme.PrimaryColor
     dropdownList.BorderSizePixel = 0
     dropdownList.Visible = false
     dropdownList.Parent = dropdownFrame
     dropdownList.ZIndex = dropdownFrame.ZIndex + 1
 
+    local listGradient = Instance.new("UIGradient")
+    listGradient.Color = self.Theme.Gradient
+    listGradient.Parent = dropdownList
+
     local listCorner = Instance.new("UICorner")
     listCorner.CornerRadius = self.Theme.CornerRadius
-    listCorner.Parent = dropdownList
+    list锦 = dropdownList
 
     local listLayout = Instance.new("UIListLayout")
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -376,7 +387,7 @@ function UILibrary:CreateDropdown(window, text, options, callback, size)
     local optionButtons = {}
     for i, option in ipairs(options or {}) do
         local optionButton = Instance.new("TextButton")
-        optionButton.Size = UDim2.new(1, 0, 0, 30 * self.Theme.ScaleFactor)
+        optionButton.Size = UDim2.new(1, 0, 0, 30 * scale)
         optionButton.BackgroundColor3 = self.Theme.SecondaryColor
         optionButton.Text = option
         optionButton.TextColor3 = self.Theme.TextColor
@@ -389,58 +400,73 @@ function UILibrary:CreateDropdown(window, text, options, callback, size)
         optionCorner.CornerRadius = self.Theme.CornerRadius
         optionCorner.Parent = optionButton
 
-        optionButton.MouseButton1Click:Connect(function()
-            dropdownButton.Text = option
-            dropdownList.Visible = false
-            TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
-            callback(option)
-            local sound = Instance.new("Sound")
-            sound.SoundId = self.Theme.ClickSound
-            sound.Parent = dropdownFrame
-            SoundService:PlayLocalSound(sound)
+        optionButton.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dropdownButton.Text = option
+                dropdownList.Visible = false
+                TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
+                callback(option)
+                local sound = Instance.new("Sound")
+                sound.SoundId = self.Theme.ClickSound
+                sound.Parent = dropdownFrame
+                SoundService:PlayLocalSound(sound)
+            end
         end)
 
         table.insert(optionButtons, optionButton)
     end
 
-    dropdownButton.MouseButton1Click:Connect(function()
-        dropdownList.Visible = not dropdownList.Visible
-        local listHeight = #optionButtons * 30 * self.Theme.ScaleFactor + 10 * self.Theme.ScaleFactor
-        TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, dropdownList.Visible and listHeight or 0)}):Play()
-        local sound = Instance.new("Sound")
-        sound.SoundId = self.Theme.ClickSound
-        sound.Parent = dropdownFrame
-        SoundService:PlayLocalSound(sound)
+    dropdownButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dropdownList.Visible = not dropdownList.Visible
+            local listHeight = #optionButtons * 30 * scale + 10 * scale
+            TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, dropdownList.Visible and listHeight or 0)}):Play()
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = dropdownFrame
+            SoundService:PlayLocalSound(sound)
+        end
     end)
 
-    window.ElementOffset = window.ElementOffset + dropdownFrame.Size.Y.Offset + 10 * self.Theme.ScaleFactor
+    window.ElementOffset = window.ElementOffset + dropdownFrame.Size.Y.Offset + 10 * scale
     table.insert(window.Elements, dropdownFrame)
     return dropdownFrame
 end
 
 -- Create a Slider
 function UILibrary:CreateSlider(window, text, min, max, default, callback, size)
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
     local sliderFrame = Instance.new("Frame")
-    sliderFrame.Size = size or UDim2.new(0, 380 * self.Theme.ScaleFactor, 0, 50 * self.Theme.ScaleFactor)
-    sliderFrame.Position = UDim2.new(0, 10 * self.Theme.ScaleFactor, 0, window.ElementOffset)
+    sliderFrame.Size = size or UDim2.new(0, 380 * scale, 0, 50 * scale)
+    sliderFrame.Position = UDim2.new(0, 10 * scale, 0, window.ElementOffset)
     sliderFrame.BackgroundTransparency = 1
     sliderFrame.Parent = window.Frame
     sliderFrame.ZIndex = window.Frame.ZIndex + 2
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0, 300 * self.Theme.ScaleFactor, 0, 20 * self.Theme.ScaleFactor)
+    label.Size = UDim2.new(0, 300 * scale, 0, 20 * scale)
     label.BackgroundTransparency = 1
-    label.Text = text or "Slider: " .. tostring(default or min)
+    label.Text = text or "Slider"
     label.TextColor3 = self.Theme.TextColor
     label.TextScaled = true
     label.Font = self.Theme.Font
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = sliderFrame
 
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 60 * scale, 0, 20 * scale)
+    valueLabel.Position = UDim2.new(1, -(70 * scale), 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(default or min)
+    valueLabel.TextColor3 = self.Theme.TextColor
+    valueLabel.TextScaled = true
+    valueLabel.Font = self.Theme.Font
+    valueLabel.Parent = sliderFrame
+
     local sliderBar = Instance.new("Frame")
-    sliderBar.Size = UDim2.new(1, 0, 0, 10 * self.Theme.ScaleFactor)
-    sliderBar.Position = UDim2.new(0, 0, 0, 30 * self.Theme.ScaleFactor)
-    sliderBar.BackgroundColor3 = self.Theme.DisabledColor
+    sliderBar.Size = UDim2.new(1, 0, 0, 10 * scale)
+    sliderBar.Position = UDim2.new(0, 0, 0, 30 * scale)
+    sliderBar.BackgroundColor3 = self.Theme.HoverColor
     sliderBar.Parent = sliderFrame
 
     local corner = Instance.new("UICorner")
@@ -448,7 +474,7 @@ function UILibrary:CreateSlider(window, text, min, max, default, callback, size)
     corner.Parent = sliderBar
 
     local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.Size = UDim2.new((default or min) / max, 0, 1, 0)
     fill.BackgroundColor3 = self.Theme.SecondaryColor
     fill.Parent = sliderBar
 
@@ -456,113 +482,159 @@ function UILibrary:CreateSlider(window, text, min, max, default, callback, size)
     fillCorner.CornerRadius = UDim.new(0, 5)
     fillCorner.Parent = fill
 
-    local knob = Instance.new("TextButton")
-    knob.Size = UDim2.new(0, 20 * self.Theme.ScaleFactor, 0, 20 * self.Theme.ScaleFactor)
-    knob.Position = UDim2.new((default - min) / (max - min), -10 * self.Theme.ScaleFactor, 0, -5 * self.Theme.ScaleFactor)
-    knob.BackgroundColor3 = self.Theme.TextColor
-    knob.Text = ""
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 20 * scale, 0, 20 * scale)
+    knob.Position = UDim2.new((default or min) / max, -10 * scale, 0, -5 * scale)
+    knob.BackgroundColor3 = self.Theme.SecondaryColor
     knob.Parent = sliderBar
 
     local knobCorner = Instance.new("UICorner")
     knobCorner.CornerRadius = UDim.new(0, 10)
     knobCorner.Parent = knob
 
-    local function updateSlider(input)
-        local delta = (input.Position.X - sliderBar.Absolute:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = state and self.Theme.SecondaryColor or self.Theme.HoverColor}):Play()
-        callback(state)
-        local sound = Instance.new("Sound")
-        sound.SoundId = self.Theme.ClickSound
-        sound.Parent = toggleFrame
-        SoundService:PlayLocalSound(sound)
+    local dragging = false
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+    sliderBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local mousePos = input.Position.X
+            local barPos = sliderBar.AbsolutePosition.X
+            local barSize = sliderBar.AbsoluteSize.X
+            local t = math.clamp((mousePos - barPos) / barSize, 0, 1)
+            local value = min + t * (max - min)
+            value = math.round(value * 100) / 100 -- Round to 2 decimal places
+            fill.Size = UDim2.new(t, 0, 1, 0)
+            knob.Position = UDim2.new(t, -10 * scale, 0, -5 * scale)
+            valueLabel.Text = tostring(value)
+            callback(value)
+        end
     end)
 
-    window.ElementOffset = window.ElementOffset + toggleFrame.Size.Y.Offset + 10
-    table.insert(window.Elements, toggleFrame)
-    return toggleFrame
+    window.ElementOffset = window.ElementOffset + sliderFrame.Size.Y.Offset + 10 * scale
+    table.insert(window.Elements, sliderFrame)
+    return sliderFrame
 end
 
--- Create a Dropdown
-function UILibrary:CreateDropdown(window, text, options, callback, size)
-    local dropdownFrame = Instance.new("Frame")
-    dropdownFrame.Size = size or UDim2.new(0, 200, 0, 40)
-    dropdownFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
-    dropdownFrame.BackgroundColor3 = self.Theme.PrimaryColor
-    dropdownFrame.Parent = window.Frame
-    dropdownFrame.ZIndex = window.Frame.ZIndex + 2
+-- Create a Color Picker
+function UILibrary:CreateColorPicker(window, text, default, callback, size)
+    local scale = self.IsMobile and self.Theme.MobileScale or 1
+    local pickerFrame = Instance.new("Frame")
+    pickerFrame.Size = size or UDim2.new(0, 380 * scale, 0, 60 * scale)
+    pickerFrame.Position = UDim2.new(0, 10 * scale, 0, window.ElementOffset)
+    pickerFrame.BackgroundTransparency = 1
+    pickerFrame.Parent = window.Frame
+    pickerFrame.ZIndex = window.Frame.ZIndex + 2
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 300 * scale, 0, 20 * scale)
+    label.BackgroundTransparency = 1
+    label.Text = text or "Color Picker"
+    label.TextColor3 = self.Theme.TextColor
+    label.TextScaled = true
+    label.Font = self.Theme.Font
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = pickerFrame
+
+    local colorButton = Instance.new("TextButton")
+    colorButton.Size = UDim2.new(0, 40 * scale, 0, 40 * scale)
+    colorButton.Position = UDim2.new(1, -(50 * scale), 0, 10 * scale)
+    colorButton.BackgroundColor3 = default or Color3.fromRGB(255, 255, 255)
+    colorButton.Text = ""
+    colorButton.Parent = pickerFrame
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = self.Theme.CornerRadius
-    corner.Parent = dropdownFrame
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = colorButton
 
-    local dropdownButton = Instance.new("TextButton")
-    dropdownButton.Size = UDim2.new(1, 0, 1, 0)
-    dropdownButton.BackgroundTransparency = 1
-    dropdownButton.Text = text or "Select an option"
-    dropdownButton.TextColor3 = self.Theme.TextColor
-    dropdownButton.TextScaled = true
-    dropdownButton.Font = self.Theme.Font
-    dropdownButton.Parent = dropdownFrame
+    local pickerFrameInner = Instance.new("Frame")
+    pickerFrameInner.Size = UDim2.new(0, 200 * scale, 0, 100 * scale)
+    pickerFrameInner.Position = UDim2.new(0, 0, 1, 5 * scale)
+    pickerFrameInner.BackgroundColor3 = self.Theme.PrimaryColor
+    pickerFrameInner.Visible = false
+    pickerFrameInner.Parent = pickerFrame
+    pickerFrameInner.ZIndex = pickerFrame.ZIndex + 1
 
-    local dropdownList = Instance.new("Frame")
-    dropdownList.Size = UDim2.new(1, 0, 0, 0)
-    dropdownList.Position = UDim2.new(0, 0, 1, 5)
-    dropdownList.BackgroundColor3 = self.Theme.PrimaryColor
-    dropdownList.BorderSizePixel = 0
-    dropdownList.Visible = false
-    dropdownList.Parent = dropdownFrame
-    dropdownList.ZIndex = dropdownFrame.ZIndex + 1
+    local pickerCorner = Instance.new("UICorner")
+    pickerCorner.CornerRadius = self.Theme.CornerRadius
+    pickerCorner.Parent = pickerFrameInner
 
-    local listCorner = Instance.new("UICorner")
-    listCorner.CornerRadius = self.Theme.CornerRadius
-    listCorner.Parent = dropdownList
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = self.Theme.Gradient
+    gradient.Parent = pickerFrameInner
 
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Parent = dropdownList
+    local hueBar = Instance.new("Frame")
+    hueBar.Size = UDim2.new(1, -10 * scale, 0, 10 * scale)
+    hueBar.Position = UDim2.new(0, 5 * scale, 0, 5 * scale)
+    hueBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    hueBar.Parent = pickerFrameInner
 
-    local optionButtons = {}
-    for i, option in ipairs(options or {}) do
-        local optionButton = Instance.new("TextButton")
-        optionButton.Size = UDim2.new(1, 0, 0, 30)
-        optionButton.BackgroundColor3 = self.Theme.SecondaryColor
-        optionButton.Text = option
-        optionButton.TextColor3 = self.Theme.TextColor
-        optionButton.TextScaled = true
-        optionButton.Font = self.Theme.Font
-        optionButton.Parent = dropdownList
-        optionButton.ZIndex = dropdownList.ZIndex + 1
+    local hueGradient = Instance.new("UIGradient")
+    hueGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+        ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+    })
+    hueGradient.Parent = hueBar
 
-        local optionCorner = Instance.new("UICorner")
-        optionCorner.CornerRadius = self.Theme.CornerRadius
-        optionCorner.Parent = optionButton
+    local hueKnob = Instance.new("Frame")
+    hueKnob.Size = UDim2.new(0, 10 * scale, 0, 10 * scale)
+    hueKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    hueKnob.Parent = hueBar
 
-        optionButton.MouseButton1Click:Connect(function()
-            dropdownButton.Text = option
-            dropdownList.Visible = false
-            TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
-            callback(option)
-            local sound = Instance.new("Sound")
-            sound.SoundId = self.Theme.ClickSound
-            sound.Parent = dropdownFrame
-            SoundService:PlayLocalSound(sound)
-        end)
+    local hueKnobCorner = Instance.new("UICorner")
+    hueKnobCorner.CornerRadius = UDim.new(0, 5)
+    hueKnobCorner.Parent = hueKnob
 
-        table.insert(optionButtons, optionButton)
-    end
-
-    dropdownButton.MouseButton1Click:Connect(function()
-        dropdownList.Visible = not dropdownList.Visible
-        local listHeight = #optionButtons * 30 + 10
-        TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, dropdownList.Visible and listHeight or 0)}):Play()
-        local sound = Instance.new("Sound")
-        sound.SoundId = self.Theme.ClickSound
-        sound.Parent = dropdownFrame
-        SoundService:PlayLocalSound(sound)
+    local dragging = false
+    hueBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+    hueBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local mousePos = input.Position.X
+            local barPos = hueBar.AbsolutePosition.X
+            local barSize = hueBar.AbsoluteSize.X
+            local t = math.clamp((mousePos - barPos) / barSize, 0, 1)
+            hueKnob.Position = UDim2.new(t, -5 * scale, 0, 0)
+            local hue = t * 360
+            local color = Color3.fromHSV(hue / 360, 1, 1)
+            colorButton.BackgroundColor3 = color
+            callback(color)
+        end
     end)
 
-    window.ElementOffset = window.ElementOffset + dropdownFrame.Size.Y.Offset + 10
-    table.insert(window.Elements, dropdownFrame)
-    return dropdownFrame
+    colorButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            pickerFrameInner.Visible = not pickerFrameInner.Visible
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = pickerFrame
+            SoundService:PlayLocalSound(sound)
+        end
+    end)
+
+    window.ElementOffset = window.ElementOffset + pickerFrame.Size.Y.Offset + 10 * scale
+    table.insert(window.Elements, pickerFrame)
+    return pickerFrame
 end
 
 return UILibrary
