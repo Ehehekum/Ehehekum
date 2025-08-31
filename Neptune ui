@@ -1,405 +1,371 @@
--- Ultimate Roblox Key System (No Notifications)
+-- Advanced Roblox UI Library (Version 1.0)
+-- Features: Windows, Buttons, Labels, Text Inputs, Toggles, Dropdowns, Themes, Animations, Custom Decals
+
+local UILibrary = {}
+UILibrary.__index = UILibrary
+
+-- Services
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
 
--- Default configuration
-getgenv().KeySystemConfig = getgenv().KeySystemConfig or {
-    Keys = {
-        {Key = "EPIC2025", UserId = nil, Expires = 1767225599}, -- Expires Dec 31, 2025
-        {Key = "TEST123", UserId = nil, Expires = 1735689599}, -- Expires Dec 31, 2024
-    },
-    Icon = "rbxassetid://18353443327", -- Default icon
-    SoundId = "rbxassetid://9120386446", -- Default sound
-    PrimaryColor = Color3.fromRGB(255, 50, 100), -- Red
-    SecondaryColor = Color3.fromRGB(255, 150, 0), -- Orange
-    GlowColor = Color3.fromRGB(255, 100, 150), -- Pink glow
-    LastKey = nil, -- Stores last valid key
-    ScriptAccess = false -- Tracks validation
+-- Default Theme
+local defaultTheme = {
+    PrimaryColor = Color3.fromRGB(35, 35, 35),    -- Dark background
+    SecondaryColor = Color3.fromRGB(0, 191, 255), -- Accent color (blue)
+    TextColor = Color3.fromRGB(255, 255, 255),
+    HoverColor = Color3.fromRGB(50, 50, 50),
+    Font = Enum.Font.Gotham,
+    FontBold = Enum.Font.GothamBold,
+    CornerRadius = UDim.new(0, 8),
+    ClickSound = "rbxassetid://9120386436" -- Verified notification sound
 }
 
--- Validate icon
-local function validateIcon(iconId)
-    if iconId and iconId ~= "" then
-        local success, result = pcall(function()
-            local id = tonumber(iconId:match("%d+"))
-            if id then
-                local info = MarketplaceService:GetProductInfo(id)
-                return info.AssetTypeId == 1 or info.AssetTypeId == 13 -- Image or Decal
+-- Default Decal IDs (verified as of August 31, 2025)
+local defaultDecals = {
+    buttonIcon = "rbxassetid://5108877300" -- Green checkmark icon
+}
+
+-- Main UI Class
+function UILibrary.new(config)
+    config = config or {}
+    local self = setmetatable({}, UILibrary)
+    
+    self.ScreenGui = Instance.new("ScreenGui")
+    self.ScreenGui.Name = "UILibraryGui"
+    self.ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+    self.ScreenGui.ResetOnSpawn = false
+    self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    self.Theme = config.theme or defaultTheme
+    self.Windows = {}
+    self.ZIndex = 1000
+    
+    return self
+end
+
+-- Create a Window
+function UILibrary:CreateWindow(title, size, position, draggable)
+    local window = {}
+    window.Frame = Instance.new("Frame")
+    window.Frame.Size = size or UDim2.new(0, 400, 0, 300)
+    window.Frame.Position = position or UDim2.new(0.5, -200, 0.5, -150)
+    window.Frame.BackgroundColor3 = self.Theme.PrimaryColor
+    window.Frame.BorderSizePixel = 0
+    window.Frame.Parent = self.ScreenGui
+    window.Frame.ZIndex = self.ZIndex
+    self.ZIndex = self.ZIndex + 10
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Theme.CornerRadius
+    corner.Parent = window.Frame
+
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.BackgroundColor3 = self.Theme.SecondaryColor
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = window.Frame
+    titleBar.ZIndex = window.Frame.ZIndex + 1
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0, 200, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title or "Window"
+    titleLabel.TextColor3 = self.Theme.TextColor
+    titleLabel.TextScaled = true
+    titleLabel.Font = self.Theme.FontBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBar
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 24, 0, 24)
+    closeButton.Position = UDim2.new(1, -30, 0, 3)
+    closeButton.BackgroundTransparency = 1
+    closeButton.Text = "X"
+    closeButton.TextColor3 = self.Theme.TextColor
+    closeButton.Font = self.Theme.FontBold
+    closeButton.TextScaled = true
+    closeButton.Parent = titleBar
+
+    -- Draggable
+    if draggable then
+        local dragging, dragStart, startPos
+        titleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                dragStart = input.Position
+                startPos = window.Frame.Position
             end
-            return false
         end)
-        if success and result then
-            return iconId
-        end
-    end
-    return "rbxassetid://18353443327" -- Fallback vibrant icon
-end
-
--- Create key system GUI
-local function createKeySystemGUI()
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "KeySystemGUI"
-    ScreenGui.Parent = PlayerGui
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.IgnoreGuiInset = true
-
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 400, 0, 240)
-    Frame.Position = UDim2.new(0.5, -200, 0.5, -120)
-    Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    Frame.BorderSizePixel = 0
-    Frame.Parent = ScreenGui
-
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 15)
-    UICorner.Parent = Frame
-
-    local UIGradient = Instance.new("UIGradient")
-    UIGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, getgenv().KeySystemConfig.PrimaryColor),
-        ColorSequenceKeypoint.new(1, getgenv().KeySystemConfig.SecondaryColor)
-    }
-    UIGradient.Rotation = 135
-    UIGradient.Parent = Frame
-
-    local UIStroke = Instance.new("UIStroke")
-    UIStroke.Thickness = 3
-    UIStroke.Color = getgenv().KeySystemConfig.GlowColor
-    UIStroke.Transparency = 0.2
-    UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    UIStroke.Parent = Frame
-    local function pulseGlow()
-        while Frame.Parent do
-            TweenService:Create(UIStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                Transparency = 0
-            }):Play()
-            wait(1)
-            TweenService:Create(UIStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                Transparency = 0.2
-            }):Play()
-            wait(1)
-        end
-    end
-    spawn(pulseGlow)
-
-    local Icon = Instance.new("ImageLabel")
-    Icon.Size = UDim2.new(0, 50, 0, 50)
-    Icon.Position = UDim2.new(0, 10, 0, 10)
-    Icon.BackgroundTransparency = 1
-    Icon.Image = validateIcon(getgenv().KeySystemConfig.Icon)
-    Icon.Parent = Frame
-    TweenService:Create(Icon, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Rotation = 360
-    }):Play()
-
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -70, 0, 40)
-    Title.Position = UDim2.new(0, 70, 0, 15)
-    Title.BackgroundTransparency = 1
-    Title.Text = "Key System"
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.TextSize = 24
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.Font = Enum.Font.FredokaOne
-    Title.Parent = Frame
-
-    local KeyInput = Instance.new("TextBox")
-    KeyInput.Size = UDim2.new(0, 300, 0, 40)
-    KeyInput.Position = UDim2.new(0.5, -150, 0, 80)
-    KeyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    KeyInput.Text = getgenv().KeySystemConfig.LastKey or "Enter Key"
-    KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    KeyInput.TextSize = 16
-    KeyInput.Font = Enum.Font.Gotham
-    KeyInput.Parent = Frame
-    local KeyCorner = Instance.new("UICorner")
-    KeyCorner.CornerRadius = UDim.new(0, 8)
-    KeyCorner.Parent = KeyInput
-
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(0, 300, 0, 30)
-    StatusLabel.Position = UDim2.new(0.5, -150, 0, 130)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Text = ""
-    StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    StatusLabel.TextSize = 14
-    StatusLabel.TextWrapped = true
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.Parent = Frame
-
-    local SubmitButton = Instance.new("TextButton")
-    SubmitButton.Size = UDim2.new(0, 120, 0, 40)
-    SubmitButton.Position = UDim2.new(0.5, -60, 0, 170)
-    SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    SubmitButton.Text = "Submit"
-    SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SubmitButton.TextSize = 16
-    SubmitButton.Font = Enum.Font.FredokaOne
-    SubmitButton.Parent = Frame
-    local SubmitCorner = Instance.new("UICorner")
-    SubmitCorner.CornerRadius = UDim.new(0, 10)
-    SubmitCorner.Parent = SubmitButton
-
-    local Sound = Instance.new("Sound")
-    Sound.SoundId = getgenv().KeySystemConfig.SoundId
-    Sound.Volume = 0.8
-    Sound.Parent = Frame
-    Sound:Play()
-
-    SubmitButton.MouseEnter:Connect(function()
-        TweenService:Create(SubmitButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-            Size = UDim2.new(0, 125, 0, 42),
-            Rotation = 2
-        }):Play()
-    end)
-    SubmitButton.MouseLeave:Connect(function()
-        TweenService:Create(SubmitButton, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-            Size = UDim2.new(0, 120, 0, 40),
-            Rotation = 0
-        }):Play()
-    end)
-
-    local function validateKey(key)
-        for _, keyData in ipairs(getgenv().KeySystemConfig.Keys) do
-            if keyData.Key == key then
-                if keyData.UserId and keyData.UserId ~= LocalPlayer.UserId then
-                    return false, "Key is bound to another user!"
-                end
-                if keyData.Expires and os.time() > keyData.Expires then
-                    return false, "Key has expired!"
-                }
-                return true, "Key validated successfully!"
+        titleBar.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
             end
-        end
-        return false, "Invalid key!"
-    end
-
-    SubmitButton.MouseButton1Click:Connect(function()
-        local key = KeyInput.Text
-        local success, message = validateKey(key)
-        StatusLabel.Text = message
-        StatusLabel.TextColor3 = success and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 100, 100)
-        if success then
-            getgenv().KeySystemConfig.LastKey = key
-            getgenv().KeySystemConfig.ScriptAccess = true
-            local ClickSound = Instance.new("Sound")
-            ClickSound.SoundId = "rbxassetid://206279937"
-            ClickSound.Volume = 0.5
-            ClickSound.Parent = Frame
-            ClickSound:Play()
-            TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                Position = UDim2.new(0.5, -200, 0.5, -400)
-            }):Play()
-            wait(0.5)
-            ScreenGui:Destroy()
-        end
-    end)
-
-    if getgenv().KeySystemConfig.LastKey then
-        local success, message = validateKey(getgenv().KeySystemConfig.LastKey)
-        if success then
-            getgenv().KeySystemConfig.ScriptAccess = true
-            StatusLabel.Text = "Auto-validated key: " .. getgenv().KeySystemConfig.LastKey
-            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-            wait(1)
-            TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                Position = UDim2.new(0.5, -200, 0.5, -400)
-            }):Play()
-            wait(0.5)
-            ScreenGui:Destroy()
-            return
-        else
-            getgenv().KeySystemConfig.LastKey = nil
-            KeyInput.Text = "Enter Key"
-            StatusLabel.Text = message
-        end
-    end
-
-    local tweenIn = TweenService:Create(Frame, TweenInfo.new(0.7, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {
-        Position = UDim2.new(0.5, -200, 0.5, -120)
-    })
-    tweenIn:Play()
-end
-
--- Main logic
-if not getgenv().KeySystemConfig.ScriptAccess then
-    createKeySystemGUI()
-else
-    print("Script access granted!")
-end valueLabel.TextColor3 = COLORS.TextSecondary
-    valueLabel.Font = Enum.Font.Gotham
-    valueLabel.TextSize = 14
-    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    valueLabel.Parent = container
-
-    local sliderBg = Instance.new("Frame")
-    sliderBg.Size = UDim2.new(1, 0, 0, 6)
-    sliderBg.Position = UDim2.new(0, 0, 0, 30)
-    sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    sliderBg.BorderSizePixel = 0
-    sliderBg.Parent = container
-    createCorner(sliderBg, 3)
-
-    local currentValue = defaultValue or minValue
-    local sliderFill = Instance.new("Frame")
-    sliderFill.Size = UDim2.new((currentValue - minValue) / (maxValue - minValue), 0, 1, 0)
-    sliderFill.BackgroundColor3 = COLORS.Accent
-    sliderFill.BorderSizePixel = 0
-    sliderFill.Parent = sliderBg
-    createCorner(sliderFill, 3)
-
-    local sliderKnob = Instance.new("Frame")
-    sliderKnob.Size = UDim2.new(0, 14, 0, 14)
-    sliderKnob.Position = UDim2.new((currentValue - minValue) / (maxValue - minValue), -7, 0.5, -7)
-    sliderKnob.BackgroundColor3 = COLORS.TextPrimary
-    sliderKnob.BorderSizePixel = 0
-    sliderKnob.Parent = sliderBg
-    createCorner(sliderKnob, 7)
-
-    local dragging = false
-    sliderBg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-        end
-    end)
-    sliderBg.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-            local mousePos = UserInputService:GetMouseLocation()
-            local sliderPos = sliderBg.AbsolutePosition
-            local sliderSize = sliderBg.AbsoluteSize
-            local relativePos = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
-            currentValue = minValue + (maxValue - minValue) * relativePos
-            sliderFill.Size = UDim2.new(relativePos, 0, 1, 0)
-            sliderKnob.Position = UDim2.new(relativePos, -7, 0.5, -7)
-            valueLabel.Text = tostring(math.floor(currentValue)) .. (suffix or "")
-            if callback then
-                callback(currentValue)
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = input.Position - dragStart
+                window.Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             end
-        end
-    end)
-    sliderBg.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
+        end)
+    end
+
+    -- Close Button
+    closeButton.MouseButton1Click:Connect(function()
+        window.Frame:Destroy()
+        self.Windows[window] = nil
+        local sound = Instance.new("Sound")
+        sound.SoundId = self.Theme.ClickSound
+        sound.Parent = window.Frame
+        SoundService:PlayLocalSound(sound)
     end)
 
-    return sliderBg, function() return currentValue end
+    window.Elements = {}
+    window.ElementOffset = 40 -- Start elements below title bar
+    table.insert(self.Windows, window)
+    return window
 end
 
--- Create Dropdown
-function NeptuneUI:CreateDropdown(section, name, options, defaultOption, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 40)
-    container.BackgroundTransparency = 1
-    container.Parent = section
+-- Create a Button
+function UILibrary:CreateButton(window, text, callback, size, iconId)
+    local buttonFrame = Instance.new("TextButton")
+    buttonFrame.Size = size or UDim2.new(0, 200, 0, 40)
+    buttonFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    buttonFrame.BackgroundColor3 = self.Theme.SecondaryColor
+    buttonFrame.Text = text or "Button"
+    buttonFrame.TextColor3 = self.Theme.TextColor
+    buttonFrame.TextScaled = true
+    buttonFrame.Font = self.Theme.Font
+    buttonFrame.Parent = window.Frame
+    buttonFrame.ZIndex = window.Frame.ZIndex + 2
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Theme.CornerRadius
+    corner.Parent = buttonFrame
+
+    if iconId or defaultDecals.buttonIcon then
+        local icon = Instance.new("ImageLabel")
+        icon.Size = UDim2.new(0, 24, 0, 24)
+        icon.Position = UDim2.new(0, 10, 0, 8)
+        icon.BackgroundTransparency = 1
+        icon.Image = iconId or defaultDecals.buttonIcon
+        icon.ImageColor3 = self.Theme.TextColor
+        icon.Parent = buttonFrame
+        buttonFrame.TextXAlignment = Enum.TextXAlignment.Right
+        buttonFrame.Text = " " .. buttonFrame.Text
+    end
+
+    -- Hover Effect
+    buttonFrame.MouseEnter:Connect(function()
+        TweenService:Create(buttonFrame, TweenInfo.new(0.2), {BackgroundColor3 = self.Theme.HoverColor}):Play()
+    end)
+    buttonFrame.MouseLeave:Connect(function()
+        TweenService:Create(buttonFrame, TweenInfo.new(0.2), {BackgroundColor3 = self.Theme.SecondaryColor}):Play()
+    end)
+
+    -- Click Event
+    buttonFrame.MouseButton1Click:Connect(function()
+        callback()
+        local sound = Instance.new("Sound")
+        sound.SoundId = self.Theme.ClickSound
+        sound.Parent = buttonFrame
+        SoundService:PlayLocalSound(sound)
+    end)
+
+    window.ElementOffset = window.ElementOffset + buttonFrame.Size.Y.Offset + 10
+    table.insert(window.Elements, buttonFrame)
+    return buttonFrame
+end
+
+-- Create a Label
+function UILibrary:CreateLabel(window, text, size)
+    local label = Instance.new("TextLabel")
+    label.Size = size or UDim2.new(0, 200, 0, 30)
+    label.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    label.BackgroundTransparency = 1
+    label.Text = text or "Label"
+    label.TextColor3 = self.Theme.TextColor
+    label.TextScaled = true
+    label.Font = self.Theme.Font
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = window.Frame
+    label.ZIndex = window.Frame.ZIndex + 2
+
+    window.ElementOffset = window.ElementOffset + label.Size.Y.Offset + 10
+    table.insert(window.Elements, label)
+    return label
+end
+
+-- Create a Text Input
+function UILibrary:CreateTextInput(window, placeholder, callback, size)
+    local inputFrame = Instance.new("Frame")
+    inputFrame.Size = size or UDim2.new(0, 200, 0, 40)
+    inputFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    inputFrame.BackgroundColor3 = self.Theme.PrimaryColor
+    inputFrame.BorderSizePixel = 0
+    inputFrame.Parent = window.Frame
+    inputFrame.ZIndex = window.Frame.ZIndex + 2
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Theme.CornerRadius
+    corner.Parent = inputFrame
+
+    local textBox = Instance.new("TextBox")
+    textBox.Size = UDim2.new(1, -10, 1, -10)
+    textBox.Position = UDim2.new(0, 5, 0, 5)
+    textBox.BackgroundTransparency = 1
+    textBox.Text = placeholder or ""
+    textBox.PlaceholderText = placeholder or "Enter text..."
+    textBox.TextColor3 = self.Theme.TextColor
+    textBox.TextScaled = true
+    textBox.Font = self.Theme.Font
+    textBox.Parent = inputFrame
+
+    textBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            callback(textBox.Text)
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = inputFrame
+            SoundService:PlayLocalSound(sound)
+        end
+    end)
+
+    window.ElementOffset = window.ElementOffset + inputFrame.Size.Y.Offset + 10
+    table.insert(window.Elements, inputFrame)
+    return inputFrame
+end
+
+-- Create a Toggle
+function UILibrary:CreateToggle(window, text, callback, size)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = size or UDim2.new(0, 200, 0, 40)
+    toggleFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    toggleFrame.BackgroundTransparency = 1
+    toggleFrame.Parent = window.Frame
+    toggleFrame.ZIndex = window.Frame.ZIndex + 2
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -100, 0, 25)
+    label.Size = UDim2.new(0, 150, 1, 0)
     label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = COLORS.TextSecondary
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 15
+    label.Text = text or "Toggle"
+    label.TextColor3 = self.Theme.TextColor
+    label.TextScaled = true
+    label.Font = self.Theme.Font
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
+    label.Parent = toggleFrame
 
-    local dropdownBtn = Instance.new("TextButton")
-    dropdownBtn.Size = UDim2.new(0, 150, 0, 30)
-    dropdownBtn.Position = UDim2.new(1, -155, 0.5, -15)
-    dropdownBtn.BackgroundColor3 = COLORS.Button
-    dropdownBtn.Text = defaultOption or options[1] or "Select"
-    dropdownBtn.TextColor3 = COLORS.TextSecondary
-    dropdownBtn.Font = Enum.Font.Gotham
-    dropdownBtn.TextSize = 14
-    dropdownBtn.BorderSizePixel = 0
-    dropdownBtn.Parent = container
-    createCorner(dropdownBtn, 8)
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 40, 0, 20)
+    toggleButton.Position = UDim2.new(1, -40, 0, 10)
+    toggleButton.BackgroundColor3 = self.Theme.SecondaryColor
+    toggleButton.Text = ""
+    toggleButton.Parent = toggleFrame
 
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = toggleButton
+
+    local state = false
+    toggleButton.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = state and self.Theme.SecondaryColor or self.Theme.HoverColor}):Play()
+        callback(state)
+        local sound = Instance.new("Sound")
+        sound.SoundId = self.Theme.ClickSound
+        sound.Parent = toggleFrame
+        SoundService:PlayLocalSound(sound)
+    end)
+
+    window.ElementOffset = window.ElementOffset + toggleFrame.Size.Y.Offset + 10
+    table.insert(window.Elements, toggleFrame)
+    return toggleFrame
+end
+
+-- Create a Dropdown
+function UILibrary:CreateDropdown(window, text, options, callback, size)
     local dropdownFrame = Instance.new("Frame")
-    dropdownFrame.Size = UDim2.new(0, 150, 0, 0)
-    dropdownFrame.Position = UDim2.new(1, -155, 0, 35)
-    dropdownFrame.BackgroundColor3 = COLORS.Dropdown
-    dropdownFrame.BorderSizePixel = 0
-    dropdownFrame.Visible = false
-    dropdownFrame.Parent = container
-    createCorner(dropdownFrame, 8)
+    dropdownFrame.Size = size or UDim2.new(0, 200, 0, 40)
+    dropdownFrame.Position = UDim2.new(0, 10, 0, window.ElementOffset)
+    dropdownFrame.BackgroundColor3 = self.Theme.PrimaryColor
+    dropdownFrame.Parent = window.Frame
+    dropdownFrame.ZIndex = window.Frame.ZIndex + 2
 
-    local dropdownLayout = Instance.new("UIListLayout")
-    dropdownLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    dropdownLayout.Padding = UDim.new(0, 4)
-    dropdownLayout.Parent = dropdownFrame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Theme.CornerRadius
+    corner.Parent = dropdownFrame
 
-    local selectedOption = defaultOption or options[1]
-    for i, option in ipairs(options) do
-        local optionBtn = Instance.new("TextButton")
-        optionBtn.Size = UDim2.new(1, 0, 0, 30)
-        optionBtn.BackgroundColor3 = COLORS.Button
-        optionBtn.Text = option
-        optionBtn.TextColor3 = COLORS.TextSecondary
-        optionBtn.Font = Enum.Font.Gotham
-        optionBtn.TextSize = 14
-        optionBtn.BorderSizePixel = 0
-        optionBtn.Parent = dropdownFrame
-        createCorner(optionBtn, 6)
+    local dropdownButton = Instance.new("TextButton")
+    dropdownButton.Size = UDim2.new(1, 0, 1, 0)
+    dropdownButton.BackgroundTransparency = 1
+    dropdownButton.Text = text or "Select an option"
+    dropdownButton.TextColor3 = self.Theme.TextColor
+    dropdownButton.TextScaled = true
+    dropdownButton.Font = self.Theme.Font
+    dropdownButton.Parent = dropdownFrame
 
-        optionBtn.MouseButton1Click:Connect(function()
-            selectedOption = option
-            dropdownBtn.Text = option
-            dropdownFrame.Visible = false
-            if callback then
-                callback(option)
-            end
+    local dropdownList = Instance.new("Frame")
+    dropdownList.Size = UDim2.new(1, 0, 0, 0)
+    dropdownList.Position = UDim2.new(0, 0, 1, 5)
+    dropdownList.BackgroundColor3 = self.Theme.PrimaryColor
+    dropdownList.BorderSizePixel = 0
+    dropdownList.Visible = false
+    dropdownList.Parent = dropdownFrame
+    dropdownList.ZIndex = dropdownFrame.ZIndex + 1
+
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = self.Theme.CornerRadius
+    listCorner.Parent = dropdownList
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = dropdownList
+
+    local optionButtons = {}
+    for i, option in ipairs(options or {}) do
+        local optionButton = Instance.new("TextButton")
+        optionButton.Size = UDim2.new(1, 0, 0, 30)
+        optionButton.BackgroundColor3 = self.Theme.SecondaryColor
+        optionButton.Text = option
+        optionButton.TextColor3 = self.Theme.TextColor
+        optionButton.TextScaled = true
+        optionButton.Font = self.Theme.Font
+        optionButton.Parent = dropdownList
+        optionButton.ZIndex = dropdownList.ZIndex + 1
+
+        local optionCorner = Instance.new("UICorner")
+        optionCorner.CornerRadius = self.Theme.CornerRadius
+        optionCorner.Parent = optionButton
+
+        optionButton.MouseButton1Click:Connect(function()
+            dropdownButton.Text = option
+            dropdownList.Visible = false
+            TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 0)}):Play()
+            callback(option)
+            local sound = Instance.new("Sound")
+            sound.SoundId = self.Theme.ClickSound
+            sound.Parent = dropdownFrame
+            SoundService:PlayLocalSound(sound)
         end)
+
+        table.insert(optionButtons, optionButton)
     end
 
-    dropdownFrame.Size = UDim2.new(0, 150, 0, #options * 34)
-
-    dropdownBtn.MouseButton1Click:Connect(function()
-        dropdownFrame.Visible = not dropdownFrame.Visible
+    dropdownButton.MouseButton1Click:Connect(function()
+        dropdownList.Visible = not dropdownList.Visible
+        local listHeight = #optionButtons * 30 + 10
+        TweenService:Create(dropdownList, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, dropdownList.Visible and listHeight or 0)}):Play()
+        local sound = Instance.new("Sound")
+        sound.SoundId = self.Theme.ClickSound
+        sound.Parent = dropdownFrame
+        SoundService:PlayLocalSound(sound)
     end)
 
-    return dropdownBtn, function() return selectedOption end
+    window.ElementOffset = window.ElementOffset + dropdownFrame.Size.Y.Offset + 10
+    table.insert(window.Elements, dropdownFrame)
+    return dropdownFrame
 end
 
-return NeptuneUI= UDim2.new(0, 12, 0, 12)
-    sliderKnob.Position = UDim2.new((currentValue - minValue) / (maxValue - minValue), -6, 0.5, -6)
-    sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    sliderKnob.BorderSizePixel = 0
-    sliderKnob.Parent = sliderBg
-    createCorner(sliderKnob, 6)
-
-    local dragging = false
-    sliderBg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-        end
-    end)
-    sliderBg.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-            local mousePos = UserInputService:GetMouseLocation()
-            local sliderPos = sliderBg.AbsolutePosition
-            local sliderSize = sliderBg.AbsoluteSize
-            local relativePos = math.clamp((mousePos.X - sliderPos.X) / sliderSize.X, 0, 1)
-            currentValue = minValue + (maxValue - minValue) * relativePos
-            sliderFill.Size = UDim2.new(relativePos, 0, 1, 0)
-            sliderKnob.Position = UDim2.new(relativePos, -6, 0.5, -6)
-            valueLabel.Text = tostring(math.floor(currentValue)) .. (suffix or "")
-            if callback then
-                callback(currentValue)
-            end
-        end
-    end)
-    sliderBg.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    return sliderBg, function() return currentValue end
-end
-
-return SimpleUI
+return UILibrary
