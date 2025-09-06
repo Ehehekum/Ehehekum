@@ -1,76 +1,151 @@
--- TopbarUILib.lua
--- Mini library for creating clean topbar UIs with buttons & toggles
+-- SimpleTopBar: A custom Roblox topbar UI library
+local SimpleTopBar = {}
+SimpleTopBar.__index = SimpleTopBar
 
-local TopbarUILib = {}
+-- Services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local Players = game:GetService("Players")
 
--- Create the base topbar if not already created
-local function getTopbar()
-    local player = game:GetService("Players").LocalPlayer
-    local playerGui = player:WaitForChild("PlayerGui")
+-- Local player
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-    local existing = playerGui:FindFirstChild("TopbarCustomUI")
-    if existing then return existing.Topbar end
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SimpleTopBar"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
 
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "TopbarCustomUI"
-    screenGui.IgnoreGuiInset = true
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = playerGui
+-- Create Topbar Frame
+local topbarFrame = Instance.new("Frame")
+topbarFrame.Size = UDim2.new(1, 0, 0, 50)
+topbarFrame.Position = UDim2.new(0, 0, 0, 0)
+topbarFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+topbarFrame.BorderSizePixel = 0
+topbarFrame.Parent = screenGui
 
-    local topbar = Instance.new("Frame")
-    topbar.Name = "Topbar"
-    topbar.Size = UDim2.new(1, 0, 0, 40)
-    topbar.Position = UDim2.new(0, 0, 0, 0)
-    topbar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    topbar.BorderSizePixel = 0
-    topbar.Parent = screenGui
+-- UI Corner for rounded edges
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = topbarFrame
 
-    return topbar
-end
+-- UI List Layout for dynamic button/toggle positioning
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.FillDirection = Enum.FillDirection.Horizontal
+uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+uiListLayout.Padding = UDim.new(0, 10)
+uiListLayout.Parent = topbarFrame
 
--- Utility: create icon button
-local function createIcon(parent, decalId)
-    local btn = Instance.new("ImageButton")
-    btn.Size = UDim2.new(0, 36, 0, 36)
-    btn.BackgroundTransparency = 1
-    btn.Image = "rbxassetid://" .. tostring(decalId)
-    btn.Parent = parent
-    return btn
-end
+-- Animation settings
+local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
--- Add a simple button
-function TopbarUILib.AddButton(options)
-    local topbar = getTopbar()
+-- Button creation
+function SimpleTopBar:CreateButton(config)
+    local button = Instance.new("ImageButton")
+    button.Size = UDim2.new(0, 40, 0, 40)
+    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    button.BorderSizePixel = 0
+    button.Image = config.Icon or "rbxassetid://0" -- Default to no image if not provided
+    button.Parent = topbarFrame
 
-    local button = createIcon(topbar, options.Icon or 0)
-    button.Position = UDim2.new(1, - (#topbar:GetChildren() * 42), 0, 2)
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.Parent = button
 
+    -- Sound
+    local soundId = config.SoundId or nil
+    local clickSound = soundId and Instance.new("Sound")
+    if clickSound then
+        clickSound.SoundId = "rbxassetid://" .. soundId
+        clickSound.Parent = button
+    end
+
+    -- Hover animation
+    button.MouseEnter:Connect(function()
+        local tween = TweenService:Create(button, tweenInfo, {Size = UDim2.new(0, 44, 0, 44)})
+        tween:Play()
+    end)
+    button.MouseLeave:Connect(function()
+        local tween = TweenService:Create(button, tweenInfo, {Size = UDim2.new(0, 40, 0, 40)})
+        tween:Play()
+    end)
+
+    -- Click event
     button.MouseButton1Click:Connect(function()
-        if options.OnClick then
-            options.OnClick()
+        if clickSound then
+            clickSound:Play()
+        end
+        if config.Callback then
+            config.Callback()
         end
     end)
 
     return button
 end
 
--- Add a toggle button
-function TopbarUILib.AddToggle(options)
-    local topbar = getTopbar()
+-- Toggle creation
+function SimpleTopBar:CreateToggle(config)
+    local toggle = Instance.new("ImageButton")
+    toggle.Size = UDim2.new(0, 60, 0, 30)
+    toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    toggle.BorderSizePixel = 0
+    toggle.Parent = topbarFrame
 
-    local toggle = createIcon(topbar, options.IconOff or 0)
-    toggle.Position = UDim2.new(1, - (#topbar:GetChildren() * 42), 0, 2)
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 15)
+    toggleCorner.Parent = toggle
+
+    -- Toggle indicator
+    local indicator = Instance.new("ImageLabel")
+    indicator.Size = UDim2.new(0, 26, 0, 26)
+    indicator.Position = UDim2.new(0, 2, 0.5, -13)
+    indicator.BackgroundTransparency = 1
+    indicator.Image = config.IconOff or "rbxassetid://0"
+    indicator.Parent = toggle
 
     local state = false
+
+    -- Sound
+    local soundId = config.SoundId or nil
+    local toggleSound = soundId and Instance.new("Sound")
+    if toggleSound then
+        toggleSound.SoundId = "rbxassetid://" .. soundId
+        toggleSound.Parent = toggle
+    end
+
+    -- Toggle logic
     toggle.MouseButton1Click:Connect(function()
         state = not state
-        toggle.Image = "rbxassetid://" .. tostring(state and options.IconOn or options.IconOff)
-        if options.OnToggle then
-            options.OnToggle(state)
+        local targetPos = state and UDim2.new(1, -28, 0.5, -13) or UDim2.new(0, 2, 0.5, -13)
+        local targetImage = state and (config.IconOn or "rbxassetid://0") or (config.IconOff or "rbxassetid://0")
+        local bgColor = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 50)
+
+        -- Animate toggle
+        local tweenPos = TweenService:Create(indicator, tweenInfo, {Position = targetPos})
+        local tweenColor = TweenService:Create(toggle, tweenInfo, {BackgroundColor3 = bgColor})
+        indicator.Image = targetImage
+        tweenPos:Play()
+        tweenColor:Play()
+
+        if toggleSound then
+            toggleSound:Play()
+        end
+
+        if config.Callback then
+            config.Callback(state)
         end
     end)
 
     return toggle
 end
 
-return TopbarUILib
+-- Cleanup function
+function SimpleTopBar:Destroy()
+    screenGui:Destroy()
+end
+
+-- Return the library
+return SimpleTopBar
