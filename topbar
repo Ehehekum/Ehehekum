@@ -1,4 +1,4 @@
--- SimpleTopBar: A clean, Roblox-style topbar UI library
+-- SimpleTopBar: A clean, right-aligned button and toggle UI library
 local SimpleTopBar = {}
 SimpleTopBar.__index = SimpleTopBar
 
@@ -19,27 +19,14 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true -- Aligns with Roblox topbar
 screenGui.Parent = playerGui
 
--- Create Topbar Frame
-local topbarFrame = Instance.new("Frame")
-topbarFrame.Size = UDim2.new(1, 0, 0, 30)
-topbarFrame.Position = UDim2.new(0, 0, 0, 36) -- Below Roblox native topbar
-topbarFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-topbarFrame.BackgroundTransparency = 0.3 -- Semi-transparent
-topbarFrame.BorderSizePixel = 0
-topbarFrame.Parent = screenGui
-
--- UI Corner for rounded edges
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 10)
-uiCorner.Parent = topbarFrame
-
 -- UI List Layout for dynamic button/toggle positioning
 local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.FillDirection = Enum.FillDirection.Horizontal
-uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-uiListLayout.Padding = UDim.new(0, 8) -- Tighter spacing
-uiListLayout.Parent = topbarFrame
+uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+uiListLayout.Padding = UDim.new(0, 6) -- Tighter spacing
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder -- Ensure consistent ordering
+uiListLayout.Parent = screenGui
 
 -- Animation settings
 local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -48,12 +35,14 @@ local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirectio
 function SimpleTopBar:CreateButton(config)
     local button = Instance.new("ImageButton")
     button.Size = UDim2.new(0, 30, 0, 30)
+    button.Position = UDim2.new(0, 0, 0, 36) -- Below Roblox topbar
     button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     button.BackgroundTransparency = 0.2 -- Slightly transparent
     button.BorderSizePixel = 0
     button.Image = config.Icon or "rbxassetid://0"
     button.ImageTransparency = 0.1
-    button.Parent = topbarFrame
+    button.LayoutOrder = config.LayoutOrder or 0 -- For right-to-left ordering
+    button.Parent = screenGui
 
     local buttonCorner = Instance.new("UICorner")
     buttonCorner.CornerRadius = UDim.new(0, 10)
@@ -94,10 +83,12 @@ end
 function SimpleTopBar:CreateToggle(config)
     local toggle = Instance.new("ImageButton")
     toggle.Size = UDim2.new(0, 50, 0, 25)
+    toggle.Position = UDim2.new(0, 0, 0, 36) -- Below Roblox topbar
     toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     toggle.BackgroundTransparency = 0.2
     toggle.BorderSizePixel = 0
-    toggle.Parent = topbarFrame
+    toggle.LayoutOrder = config.LayoutOrder or 0 -- For right-to-left ordering
+    toggle.Parent = screenGui
 
     local toggleCorner = Instance.new("UICorner")
     toggleCorner.CornerRadius = UDim.new(0, 12)
