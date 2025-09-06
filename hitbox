@@ -1,0 +1,59 @@
+--// Hitbox Extender Library (FE via Velocity)
+-- By dabu showcase :)
+
+local lolz = {}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- emergency stop global
+if getgenv().emergency_stop == nil then
+    getgenv().emergency_stop = false
+end
+
+-- convert studs ke multiplier power
+local function StudsIntoPower(studs)
+    return studs * 6
+end
+
+-- extend hitbox
+function lolz:ExtendHitbox(studs, time)
+    local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not HRP then return end
+    
+    local distance = StudsIntoPower(studs)
+    local start = tick()
+    
+    -- reset stop
+    if getgenv().emergency_stop == true then
+        getgenv().emergency_stop = false
+    end
+
+    repeat
+        RunService.Heartbeat:Wait()
+        
+        -- pastikan char masih ada
+        HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not HRP then continue end
+        
+        -- dorongan selalu ke depan (biar bisa diem atau jalan)
+        HRP.Velocity = HRP.CFrame.LookVector * distance
+    until tick() - start > tonumber(time) or getgenv().emergency_stop == true
+    
+    -- reset velocity biar ga stuck
+    if HRP then
+        HRP.Velocity = Vector3.new(0,0,0)
+    end
+
+    -- reset emergency
+    if getgenv().emergency_stop == true then
+        getgenv().emergency_stop = false
+    end
+end
+
+-- stop extender manual
+function lolz:StopExtendingHitbox()
+    getgenv().emergency_stop = true
+end
+
+return lolz
