@@ -1,0 +1,76 @@
+-- TopbarUILib.lua
+-- Mini library for creating clean topbar UIs with buttons & toggles
+
+local TopbarUILib = {}
+
+-- Create the base topbar if not already created
+local function getTopbar()
+    local player = game:GetService("Players").LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+
+    local existing = playerGui:FindFirstChild("TopbarCustomUI")
+    if existing then return existing.Topbar end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "TopbarCustomUI"
+    screenGui.IgnoreGuiInset = true
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = playerGui
+
+    local topbar = Instance.new("Frame")
+    topbar.Name = "Topbar"
+    topbar.Size = UDim2.new(1, 0, 0, 40)
+    topbar.Position = UDim2.new(0, 0, 0, 0)
+    topbar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    topbar.BorderSizePixel = 0
+    topbar.Parent = screenGui
+
+    return topbar
+end
+
+-- Utility: create icon button
+local function createIcon(parent, decalId)
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(0, 36, 0, 36)
+    btn.BackgroundTransparency = 1
+    btn.Image = "rbxassetid://" .. tostring(decalId)
+    btn.Parent = parent
+    return btn
+end
+
+-- Add a simple button
+function TopbarUILib.AddButton(options)
+    local topbar = getTopbar()
+
+    local button = createIcon(topbar, options.Icon or 0)
+    button.Position = UDim2.new(1, - (#topbar:GetChildren() * 42), 0, 2)
+
+    button.MouseButton1Click:Connect(function()
+        if options.OnClick then
+            options.OnClick()
+        end
+    end)
+
+    return button
+end
+
+-- Add a toggle button
+function TopbarUILib.AddToggle(options)
+    local topbar = getTopbar()
+
+    local toggle = createIcon(topbar, options.IconOff or 0)
+    toggle.Position = UDim2.new(1, - (#topbar:GetChildren() * 42), 0, 2)
+
+    local state = false
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        toggle.Image = "rbxassetid://" .. tostring(state and options.IconOn or options.IconOff)
+        if options.OnToggle then
+            options.OnToggle(state)
+        end
+    end)
+
+    return toggle
+end
+
+return TopbarUILib
