@@ -1,4 +1,4 @@
--- SimpleTopBar: A custom Roblox topbar UI library
+-- SimpleTopBar: A clean, Roblox-style topbar UI library
 local SimpleTopBar = {}
 SimpleTopBar.__index = SimpleTopBar
 
@@ -16,19 +16,21 @@ local playerGui = player:WaitForChild("PlayerGui")
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SimpleTopBar"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true -- Aligns with Roblox topbar
 screenGui.Parent = playerGui
 
 -- Create Topbar Frame
 local topbarFrame = Instance.new("Frame")
-topbarFrame.Size = UDim2.new(1, 0, 0, 50)
-topbarFrame.Position = UDim2.new(0, 0, 0, 0)
-topbarFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+topbarFrame.Size = UDim2.new(1, 0, 0, 30)
+topbarFrame.Position = UDim2.new(0, 0, 0, 36) -- Below Roblox native topbar
+topbarFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+topbarFrame.BackgroundTransparency = 0.3 -- Semi-transparent
 topbarFrame.BorderSizePixel = 0
 topbarFrame.Parent = screenGui
 
 -- UI Corner for rounded edges
 local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.CornerRadius = UDim.new(0, 10)
 uiCorner.Parent = topbarFrame
 
 -- UI List Layout for dynamic button/toggle positioning
@@ -36,23 +38,25 @@ local uiListLayout = Instance.new("UIListLayout")
 uiListLayout.FillDirection = Enum.FillDirection.Horizontal
 uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-uiListLayout.Padding = UDim.new(0, 10)
+uiListLayout.Padding = UDim.new(0, 8) -- Tighter spacing
 uiListLayout.Parent = topbarFrame
 
 -- Animation settings
-local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Button creation
 function SimpleTopBar:CreateButton(config)
     local button = Instance.new("ImageButton")
-    button.Size = UDim2.new(0, 40, 0, 40)
-    button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    button.Size = UDim2.new(0, 30, 0, 30)
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    button.BackgroundTransparency = 0.2 -- Slightly transparent
     button.BorderSizePixel = 0
-    button.Image = config.Icon or "rbxassetid://0" -- Default to no image if not provided
+    button.Image = config.Icon or "rbxassetid://0"
+    button.ImageTransparency = 0.1
     button.Parent = topbarFrame
 
     local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(0, 8)
+    buttonCorner.CornerRadius = UDim.new(0, 10)
     buttonCorner.Parent = button
 
     -- Sound
@@ -65,11 +69,11 @@ function SimpleTopBar:CreateButton(config)
 
     -- Hover animation
     button.MouseEnter:Connect(function()
-        local tween = TweenService:Create(button, tweenInfo, {Size = UDim2.new(0, 44, 0, 44)})
+        local tween = TweenService:Create(button, tweenInfo, {Size = UDim2.new(0, 32, 0, 32), BackgroundTransparency = 0})
         tween:Play()
     end)
     button.MouseLeave:Connect(function()
-        local tween = TweenService:Create(button, tweenInfo, {Size = UDim2.new(0, 40, 0, 40)})
+        local tween = TweenService:Create(button, tweenInfo, {Size = UDim2.new(0, 30, 0, 30), BackgroundTransparency = 0.2})
         tween:Play()
     end)
 
@@ -89,21 +93,23 @@ end
 -- Toggle creation
 function SimpleTopBar:CreateToggle(config)
     local toggle = Instance.new("ImageButton")
-    toggle.Size = UDim2.new(0, 60, 0, 30)
-    toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    toggle.Size = UDim2.new(0, 50, 0, 25)
+    toggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    toggle.BackgroundTransparency = 0.2
     toggle.BorderSizePixel = 0
     toggle.Parent = topbarFrame
 
     local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 15)
+    toggleCorner.CornerRadius = UDim.new(0, 12)
     toggleCorner.Parent = toggle
 
     -- Toggle indicator
     local indicator = Instance.new("ImageLabel")
-    indicator.Size = UDim2.new(0, 26, 0, 26)
-    indicator.Position = UDim2.new(0, 2, 0.5, -13)
+    indicator.Size = UDim2.new(0, 21, 0, 21)
+    indicator.Position = UDim2.new(0, 2, 0.5, -10.5)
     indicator.BackgroundTransparency = 1
     indicator.Image = config.IconOff or "rbxassetid://0"
+    indicator.ImageTransparency = 0.1
     indicator.Parent = toggle
 
     local state = false
@@ -119,13 +125,13 @@ function SimpleTopBar:CreateToggle(config)
     -- Toggle logic
     toggle.MouseButton1Click:Connect(function()
         state = not state
-        local targetPos = state and UDim2.new(1, -28, 0.5, -13) or UDim2.new(0, 2, 0.5, -13)
+        local targetPos = state and UDim2.new(1, -23, 0.5, -10.5) or UDim2.new(0, 2, 0.5, -10.5)
         local targetImage = state and (config.IconOn or "rbxassetid://0") or (config.IconOff or "rbxassetid://0")
-        local bgColor = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 50)
+        local bgColor = state and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(60, 60, 60)
 
         -- Animate toggle
         local tweenPos = TweenService:Create(indicator, tweenInfo, {Position = targetPos})
-        local tweenColor = TweenService:Create(toggle, tweenInfo, {BackgroundColor3 = bgColor})
+        local tweenColor = TweenService:Create(toggle, tweenInfo, {BackgroundColor3 = bgColor, BackgroundTransparency = state and 0 or 0.2})
         indicator.Image = targetImage
         tweenPos:Play()
         tweenColor:Play()
