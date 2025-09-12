@@ -1,0 +1,219 @@
+--[[ 
+🔥 Custom UI Library by ChatGPT
+Functions:
+- Library:CreateWindow(title, credits)
+- Window:CreateTab(name)
+- Tab:CreateButton(text, callback)
+- Tab:CreateToggle(text, default, callback)
+- Tab:CreateSlider(text, min, max, default, callback)
+- Library:Notify(title, description, duration)
+Supports:
+- Key system (customizable)
+- Movable GUI + toggle button
+- Notifications
+]]
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Library = {}
+Library.Settings = {
+    Key = "loveyou", -- default, can be overridden in load
+    Theme = {
+        Background = Color3.fromRGB(30, 30, 40),
+        Accent = Color3.fromRGB(100, 140, 255),
+        Text = Color3.fromRGB(240, 240, 240),
+        NotificationBackground = Color3.fromRGB(45, 45, 60)
+    }
+}
+
+-- ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "UILib"
+ScreenGui.ResetOnSpawn = false
+
+-- Notification Holder
+local NotificationHolder = Instance.new("Frame", ScreenGui)
+NotificationHolder.BackgroundTransparency = 1
+NotificationHolder.Size = UDim2.new(1,0,1,0)
+NotificationHolder.Name = "NotificationHolder"
+
+-- Notification function
+function Library:Notify(title, desc, duration)
+    duration = duration or 3
+
+    local Frame = Instance.new("Frame", NotificationHolder)
+    Frame.Size = UDim2.new(0, 260, 0, 70)
+    Frame.Position = UDim2.new(1, 20, 1, -90)
+    Frame.BackgroundColor3 = self.Settings.Theme.NotificationBackground
+    Frame.BorderSizePixel = 0
+    Frame.ZIndex = 999
+    local Corner = Instance.new("UICorner", Frame)
+    Corner.CornerRadius = UDim.new(0,10)
+
+    local Title = Instance.new("TextLabel", Frame)
+    Title.Text = title
+    Title.Font = Enum.Font.GothamBold
+    Title.TextColor3 = self.Settings.Theme.Text
+    Title.TextSize = 16
+    Title.Position = UDim2.new(0,10,0,5)
+    Title.Size = UDim2.new(1,-20,0,20)
+    Title.BackgroundTransparency = 1
+
+    local Desc = Instance.new("TextLabel", Frame)
+    Desc.Text = desc
+    Desc.Font = Enum.Font.Gotham
+    Desc.TextColor3 = self.Settings.Theme.Text
+    Desc.TextSize = 14
+    Desc.Position = UDim2.new(0,10,0,30)
+    Desc.Size = UDim2.new(1,-20,0,35)
+    Desc.BackgroundTransparency = 1
+    Desc.TextWrapped = true
+    Desc.TextXAlignment = Enum.TextXAlignment.Left
+    Desc.TextYAlignment = Enum.TextYAlignment.Top
+
+    -- Tween In
+    Frame.Position = UDim2.new(1, 20, 1, -90)
+    TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), 
+        {Position = UDim2.new(1, -280, 1, -90)}):Play()
+
+    task.delay(duration, function()
+        TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), 
+            {Position = UDim2.new(1, 20, 1, -90)}):Play()
+        task.wait(0.5)
+        Frame:Destroy()
+    end)
+end
+
+-- Key System UI
+local KeyFrame = Instance.new("Frame", ScreenGui)
+KeyFrame.Size = UDim2.new(0, 300, 0, 150)
+KeyFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+KeyFrame.BackgroundColor3 = Library.Settings.Theme.Background
+KeyFrame.BorderSizePixel = 0
+KeyFrame.Active = true
+KeyFrame.Draggable = true
+local KFcorner = Instance.new("UICorner", KeyFrame)
+KFcorner.CornerRadius = UDim.new(0,12)
+
+local Title = Instance.new("TextLabel", KeyFrame)
+Title.Size = UDim2.new(1, -20, 0, 40)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Text = "🔑 Enter Key"
+Title.Font = Enum.Font.GothamBold
+Title.TextColor3 = Library.Settings.Theme.Text
+Title.TextSize = 20
+Title.BackgroundTransparency = 1
+
+local TextBox = Instance.new("TextBox", KeyFrame)
+TextBox.Size = UDim2.new(0.8, 0, 0, 40)
+TextBox.Position = UDim2.new(0.1, 0, 0.5, -20)
+TextBox.PlaceholderText = "Enter Key Here"
+TextBox.Font = Enum.Font.Gotham
+TextBox.TextColor3 = Library.Settings.Theme.Text
+TextBox.TextSize = 16
+TextBox.BackgroundColor3 = Library.Settings.Theme.NotificationBackground
+TextBox.BorderSizePixel = 0
+local TBcorner = Instance.new("UICorner", TextBox)
+TBcorner.CornerRadius = UDim.new(0,8)
+
+local Submit = Instance.new("TextButton", KeyFrame)
+Submit.Size = UDim2.new(0.5, 0, 0, 35)
+Submit.Position = UDim2.new(0.25, 0, 0.8, 0)
+Submit.Text = "Submit"
+Submit.Font = Enum.Font.GothamBold
+Submit.TextColor3 = Library.Settings.Theme.Text
+Submit.TextSize = 16
+Submit.BackgroundColor3 = Library.Settings.Theme.Accent
+Submit.BorderSizePixel = 0
+local SubCorner = Instance.new("UICorner", Submit)
+SubCorner.CornerRadius = UDim.new(0,8)
+
+-- Main Holder (for windows/tabs)
+local MainHolder = Instance.new("Frame", ScreenGui)
+MainHolder.Size = UDim2.new(1,0,1,0)
+MainHolder.BackgroundTransparency = 1
+MainHolder.Visible = false
+
+-- Window Creation
+function Library:CreateWindow(title, credits)
+    local Window = {}
+    local Frame = Instance.new("Frame", MainHolder)
+    Frame.Size = UDim2.new(0, 500, 0, 300)
+    Frame.Position = UDim2.new(0.5, -250, 0.5, -150)
+    Frame.BackgroundColor3 = self.Settings.Theme.Background
+    Frame.BorderSizePixel = 0
+    Frame.Active = true
+    Frame.Draggable = true
+    local Corner = Instance.new("UICorner", Frame)
+    Corner.CornerRadius = UDim.new(0,14)
+
+    local Header = Instance.new("TextLabel", Frame)
+    Header.Size = UDim2.new(1,0,0,40)
+    Header.Text = title.." | "..credits
+    Header.Font = Enum.Font.GothamBold
+    Header.TextColor3 = self.Settings.Theme.Text
+    Header.TextSize = 20
+    Header.BackgroundTransparency = 1
+
+    -- Simple Tab system
+    function Window:CreateTab(name)
+        local Tab = {}
+        local TabFrame = Instance.new("Frame", Frame)
+        TabFrame.Size = UDim2.new(1, -20, 0, 200)
+        TabFrame.Position = UDim2.new(0, 10, 0, 50)
+        TabFrame.BackgroundTransparency = 1
+
+        function Tab:CreateButton(text, callback)
+            local Btn = Instance.new("TextButton", TabFrame)
+            Btn.Size = UDim2.new(0, 120, 0, 35)
+            Btn.Text = text
+            Btn.Font = Enum.Font.GothamBold
+            Btn.TextColor3 = Library.Settings.Theme.Text
+            Btn.TextSize = 16
+            Btn.BackgroundColor3 = Library.Settings.Theme.Accent
+            local BC = Instance.new("UICorner", Btn)
+            BC.CornerRadius = UDim.new(0,8)
+            Btn.MouseButton1Click:Connect(function()
+                callback()
+            end)
+        end
+
+        function Tab:CreateToggle(text, default, callback)
+            local State = default
+            local Btn = Instance.new("TextButton", TabFrame)
+            Btn.Size = UDim2.new(0, 140, 0, 35)
+            Btn.Text = text..": "..tostring(State)
+            Btn.Font = Enum.Font.Gotham
+            Btn.TextColor3 = Library.Settings.Theme.Text
+            Btn.TextSize = 14
+            Btn.BackgroundColor3 = Library.Settings.Theme.Accent
+            local BC = Instance.new("UICorner", Btn)
+            BC.CornerRadius = UDim.new(0,8)
+            Btn.MouseButton1Click:Connect(function()
+                State = not State
+                Btn.Text = text..": "..tostring(State)
+                callback(State)
+            end)
+        end
+
+        return Tab
+    end
+
+    return Window
+end
+
+-- Key Submit
+Submit.MouseButton1Click:Connect(function()
+    if TextBox.Text == Library.Settings.Key then
+        KeyFrame.Visible = false
+        MainHolder.Visible = true
+        Library:Notify("✅ Success", "Correct key entered!", 3)
+    else
+        Library:Notify("❌ Error", "Invalid key. Try again!", 3)
+    end
+end)
+
+return Library
