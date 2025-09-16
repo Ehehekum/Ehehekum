@@ -1,255 +1,302 @@
--- Notification System for getgenv().Notify
-local TweenService = game:GetService("TweenService")
-local SoundService = game:GetService("SoundService")
-local UserInputService = game:GetService("UserInputService")
+local NotificationService = {}
 
--- Ensure LocalPlayer is available
-local player = game.Players.LocalPlayer
-if not player then
-    warn("LocalPlayer not found!")
-    return
-end
-
--- Create ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DynamicNotificationGui"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
--- Notification Container
-local notificationFrame = Instance.new("Frame")
-notificationFrame.Name = "NotificationContainer"
-notificationFrame.Size = UDim2.new(0.4, 0, 0.7, 0)
-notificationFrame.Position = UDim2.new(1, -30, 0.5, 0)
-notificationFrame.AnchorPoint = Vector2.new(1, 0.5)
-notificationFrame.BackgroundTransparency = 1
-notificationFrame.ClipsDescendants = true
-notificationFrame.Parent = screenGui
-
--- UIListLayout for stacking
-local uiListLayout = Instance.new("UIListLayout")
-uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-uiListLayout.Padding = UDim.new(0, 15)
-uiListLayout.Parent = notificationFrame
-
--- Default notification themes
-local notificationThemes = {
-    Info = {
-        bg = Color3.fromRGB(0, 170, 255),
-        accent = Color3.fromRGB(100, 200, 255),
-        text = Color3.new(1, 1, 1),
-        icon = "rbxassetid://98765432", -- Default info icon ID
-        sound = "rbxassetid://87654321", -- Default info sound ID
-        particleColor = ColorSequence.new(Color3.fromRGB(0, 170, 255), Color3.fromRGB(100, 200, 255))
-    },
-    Success = {
-        bg = Color3.fromRGB(50, 220, 100),
-        accent = Color3.fromRGB(120, 255, 150),
-        text = Color3.new(1, 1, 1),
-        icon = "rbxassetid://76543210", -- Default success icon ID
-        sound = "rbxassetid://65432109", -- Default success sound ID
-        particleColor = ColorSequence.new(Color3.fromRGB(50, 220, 100), Color3.fromRGB(120, 255, 150))
-    },
-    Warning = {
-        bg = Color3.fromRGB(255, 140, 0),
-        accent = Color3.fromRGB(255, 200, 100),
-        text = Color3.new(0, 0, 0),
-        icon = "rbxassetid://54321098", -- Default warning icon ID
-        sound = "rbxassetid://43210987", -- Default warning sound ID
-        particleColor = ColorSequence.new(Color3.fromRGB(255, 140, 0), Color3.fromRGB(255, 200, 100))
-    },
-    Error = {
-        bg = Color3.fromRGB(255, 60, 60),
-        accent = Color3.fromRGB(255, 120, 120),
-        text = Color3.new(1, 1, 1),
-        icon = "rbxassetid://32109876", -- Default error icon ID
-        sound = "rbxassetid://21098765", -- Default error sound ID
-        particleColor = ColorSequence.new(Color3.fromRGB(255, 60, 60), Color3.fromRGB(255, 120, 120))
-    },
-    Achievement = {
-        bg = Color3.fromRGB(255, 200, 0),
-        accent = Color3.fromRGB(255, 240, 150),
-        text = Color3.new(0, 0, 0),
-        icon = "rbxassetid://10987654", -- Default achievement icon ID
-        sound = "rbxassetid://98765432", -- Default achievement sound ID
-        particleColor = ColorSequence.new(Color3.fromRGB(255, 200, 0), Color3.fromRGB(255, 240, 150))
+-- Configuration
+local CONFIG = {
+    Duration = 5, -- Default duration in seconds
+    Spacing = 10, -- Space between notifications
+    MaxNotifications = 4, -- Maximum number of notifications on screen
+    SlideInTime = 0.3, -- Time to slide in (seconds)
+    SlideOutTime = 0.5, -- Time to slide out (seconds)
+    Colors = {
+        Background = Color3.fromRGB(40, 40, 40),
+        Text = Color3.fromRGB(255, 255, 255),
+        TimeText = Color3.fromRGB(180, 180, 180),
+        AppName = Color3.fromRGB(0, 122, 255),
+        Border = Color3.fromRGB(80, 80, 80)
     }
 }
 
--- Play notification sound
-local function playSound(soundId)
-    local sound = Instance.new("Sound")
-    sound.SoundId = soundId
-    sound.Volume = 0.8
-    sound.Pitch = 1 + math.random(-0.1, 0.1)
-    sound.Parent = SoundService
-    sound:Play()
-    sound.Ended:Connect(function()
-        sound:Destroy()
-    end)
-end
+-- Internal variables
+local notifications = {}
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "iPhoneNotifications"
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Create particle effect
-local function addParticleEffect(parent, particleColor)
-    local particleEmitter = Instance.new("ParticleEmitter")
-    particleEmitter.Texture = "rbxassetid://243098098" -- Replace with valid particle texture ID
-    particleEmitter.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0)})
-    particleEmitter.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1)})
-    particleEmitter.Lifetime = NumberRange.new(0.5, 1)
-    particleEmitter.Rate = 20
-    particleEmitter.Speed = NumberRange.new(5, 10)
-    particleEmitter.SpreadAngle = Vector2.new(-30, 30)
-    particleEmitter.Color = particleColor
-    particleEmitter.Parent = parent
-    task.spawn(function()
-        task.wait(0.5)
-        particleEmitter.Enabled = false
-        task.wait(1)
-        particleEmitter:Destroy()
-    end)
-end
-
--- Notify function
-getgenv().Notify = function(options)
-    -- Default options
-    local config = {
-        title = options.title or "Notification",
-        description = options.description or "",
-        notificationType = options.notificationType or "Info",
-        duration = options.duration or 6,
-        showProgressBar = options.showProgressBar or false,
-        isDismissable = options.isDismissable or true,
-        glowEffect = options.glowEffect or true,
-        customSound = options.customSound or nil,
-        customIcon = options.customIcon or nil,
-        customBackground = options.customBackground or nil,
-        customAccent = options.customAccent or nil,
-        customTextColor = options.customTextColor or nil,
-        customParticleColor = options.customParticleColor or nil
-    }
-
-    -- Validate notification type
-    local theme = notificationThemes[config.notificationType]
-    if not theme then
-        warn("Invalid notification type: " .. tostring(config.notificationType))
-        return
-    end
-
-    -- Apply custom overrides
-    local activeTheme = {
-        bg = config.customBackground or theme.bg,
-        accent = config.customAccent or theme.accent,
-        text = config.customTextColor or theme.text,
-        icon = config.customIcon or theme.icon,
-        sound = config.customSound or theme.sound,
-        particleColor = config.customParticleColor or theme.particleColor
-    }
-
+-- Create notification frame function
+function NotificationService:CreateNotification(title, message, appName, duration, icon, callback)
+    duration = duration or CONFIG.Duration
+    
     -- Create notification frame
     local notification = Instance.new("Frame")
-    notification.Size = UDim2.new(1, 0, 0, 100)
-    notification.BackgroundTransparency = 1
+    notification.Name = "iPhoneNotification"
+    notification.Size = UDim2.new(0.8, 0, 0, 80)
+    notification.Position = UDim2.new(0.1, 0, 0, -notification.Size.Y.Offset)
+    notification.AnchorPoint = Vector2.new(0, 0)
+    notification.BackgroundColor3 = CONFIG.Colors.Background
     notification.BorderSizePixel = 0
     notification.ClipsDescendants = true
-
-    -- UICorner for rounded edges
-    local uiCorner = Instance.new("UICorner")
-    uiCorner.CornerRadius = UDim.new(0, 20)
-    uiCorner.Parent = notification
-
-    -- Glow effect
-    if config.glowEffect then
-        local uiGradient = Instance.new("UIGradient")
-        uiGradient.Color = ColorSequence.new(activeTheme.accent, activeTheme.bg)
-        uiGradient.Rotation = 45
-        uiGradient.Parent = notification
-        TweenService:Create(uiGradient, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Offset = Vector2.new(1, 0)}):Play()
+    notification.ZIndex = 10
+    
+    -- Add rounded corners
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 14)
+    corner.Parent = notification
+    
+    -- Add subtle border
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = CONFIG.Colors.Border
+    stroke.Thickness = 1
+    stroke.Parent = notification
+    
+    -- Add shadow
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.Size = UDim2.new(1, 10, 1, 10)
+    shadow.Position = UDim2.new(0, -5, 0, -5)
+    shadow.BackgroundTransparency = 1
+    shadow.Image = "rbxassetid://1316045217"
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.8
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+    shadow.ZIndex = 9
+    shadow.Parent = notification
+    
+    -- Create icon
+    if icon then
+        local iconImage = Instance.new("ImageLabel")
+        iconImage.Name = "Icon"
+        iconImage.Size = UDim2.new(0, 50, 0, 50)
+        iconImage.Position = UDim2.new(0, 15, 0, 15)
+        iconImage.BackgroundTransparency = 1
+        iconImage.Image = icon
+        iconImage.ZIndex = 11
+        iconImage.Parent = notification
     end
-
-    -- Background frame
-    local bgFrame = Instance.new("Frame")
-    bgFrame.Size = UDim2.new(1, -4, 1, -4)
-    bgFrame.Position = UDim2.new(0, 2, 0, 2)
-    bgFrame.BackgroundColor3 = activeTheme.bg
-    bgFrame.BackgroundTransparency = 1
-    bgFrame.Parent = notification
-
-    local bgCorner = Instance.new("UICorner")
-    bgCorner.CornerRadius = UDim.new(0, 18)
-    bgCorner.Parent = bgFrame
-
-    -- Icon
-    local icon = Instance.new("ImageLabel")
-    icon.Size = UDim2.new(0, 60, 0, 60)
-    icon.Position = UDim2.new(0, 20, 0.5, 0)
-    icon.AnchorPoint = Vector2.new(0, 0.5)
-    icon.BackgroundTransparency = 1
-    icon.Image = activeTheme.icon
-    icon.ImageTransparency = 1
-    icon.Parent = bgFrame
-
-    -- Text container
-    local textContainer = Instance.new("Frame")
-    textContainer.Size = UDim2.new(1, -100, 1, -20)
-    textContainer.Position = UDim2.new(0, 80, 0, 10)
-    textContainer.BackgroundTransparency = 1
-    textContainer.Parent = bgFrame
-
-    -- Title
+    
+    -- Create app name label
+    local appLabel = Instance.new("TextLabel")
+    appLabel.Name = "AppName"
+    appLabel.Size = UDim2.new(0.7, -60, 0, 20)
+    appLabel.Position = UDim2.new(0, icon and 75 or 15, 0, 15)
+    appLabel.BackgroundTransparency = 1
+    appLabel.Text = appName or "App"
+    appLabel.TextColor3 = CONFIG.Colors.AppName
+    appLabel.TextSize = 14
+    appLabel.TextXAlignment = Enum.TextXAlignment.Left
+    appLabel.Font = Enum.Font.SourceSansSemibold
+    appLabel.ZIndex = 11
+    appLabel.Parent = notification
+    
+    -- Create time label
+    local timeLabel = Instance.new("TextLabel")
+    timeLabel.Name = "Time"
+    timeLabel.Size = UDim2.new(0.2, 0, 0, 20)
+    timeLabel.Position = UDim2.new(0.8, -15, 0, 15)
+    timeLabel.AnchorPoint = Vector2.new(1, 0)
+    timeLabel.BackgroundTransparency = 1
+    timeLabel.Text = os.date("%H:%M")
+    timeLabel.TextColor3 = CONFIG.Colors.TimeText
+    timeLabel.TextSize = 14
+    timeLabel.TextXAlignment = Enum.TextXAlignment.Right
+    timeLabel.Font = Enum.Font.SourceSans
+    timeLabel.ZIndex = 11
+    timeLabel.Parent = notification
+    
+    -- Create title label
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0, 30)
-    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(0.95, -60, 0, 20)
+    titleLabel.Position = UDim2.new(0, icon and 75 or 15, 0, 35)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = Enum.Font.FredokaOne
-    titleLabel.TextSize = 20
-    titleLabel.TextColor3 = activeTheme.text
-    titleLabel.TextTransparency = 1
-    titleLabel.Text = config.title
+    titleLabel.Text = title or "Notification"
+    titleLabel.TextColor3 = CONFIG.Colors.Text
+    titleLabel.TextSize = 16
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    titleLabel.Parent = textContainer
-
-    -- Description
-    local descriptionLabel = Instance.new("TextLabel")
-    descriptionLabel.Size = UDim2.new(1, 0, 0, 40)
-    descriptionLabel.Position = UDim2.new(0, 0, 0, 30)
-    descriptionLabel.BackgroundTransparency = 1
-    descriptionLabel.Font = Enum.Font.FredokaOne
-    descriptionLabel.TextSize = 14
-    descriptionLabel.TextColor3 = activeTheme.text
-    descriptionLabel.TextTransparency = 1
-    descriptionLabel.Text = config.description
-    descriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-    descriptionLabel.TextYAlignment = Enum.TextYAlignment.Top
-    descriptionLabel.TextWrapped = true
-    descriptionLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    descriptionLabel.Parent = textContainer
-
-    -- Progress bar
-    if config.showProgressBar then
-        local progressBar = Instance.new("Frame")
-        progressBar.Size = UDim2.new(0, 0, 0, 6)
-        progressBar.Position = UDim2.new(0, 0, 1, -6)
-        progressBar.BackgroundTransparency = 0.2
-        progressBar.BorderSizePixel = 0
-        local progressGradient = Instance.new("UIGradient")
-        progressGradient.Color = ColorSequence.new(activeTheme.accent, activeTheme.bg)
-        progressGradient.Parent = progressBar
-        progressBar.Parent = bgFrame
-
-        local progressTween = TweenService:Create(progressBar, TweenInfo.new(config.duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 6)})
-        progressTween:Play()
+    titleLabel.Font = Enum.Font.SourceSansSemibold
+    titleLabel.ZIndex = 11
+    titleLabel.Parent = notification
+    
+    -- Create message label
+    local messageLabel = Instance.new("TextLabel")
+    messageLabel.Name = "Message"
+    messageLabel.Size = UDim2.new(0.95, -60, 0, 20)
+    messageLabel.Position = UDim2.new(0, icon and 75 or 15, 0, 55)
+    messageLabel.BackgroundTransparency = 1
+    messageLabel.Text = message or ""
+    messageLabel.TextColor3 = CONFIG.Colors.Text
+    messageLabel.TextSize = 14
+    messageLabel.TextXAlignment = Enum.TextXAlignment.Left
+    messageLabel.TextYAlignment = Enum.TextYAlignment.Top
+    messageLabel.Font = Enum.Font.SourceSans
+    messageLabel.ZIndex = 11
+    messageLabel.Parent = notification
+    
+    -- Auto-size for multi-line messages
+    if string.len(message or "") > 30 then
+        messageLabel.Size = UDim2.new(0.95, -60, 0, 40)
+        notification.Size = UDim2.new(0.8, 0, 0, 100)
     end
+    
+    -- Make notification clickable if callback provided
+    if callback then
+        notification.BackgroundTransparency = 0.05
+        
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(1, 0, 1, 0)
+        button.BackgroundTransparency = 1
+        button.BorderSizePixel = 0
+        button.Text = ""
+        button.ZIndex = 12
+        button.Parent = notification
+        
+        button.MouseButton1Click:Connect(function()
+            callback()
+            self:RemoveNotification(notification)
+        end)
+    end
+    
+    -- Add to screen
+    notification.Parent = screenGui
+    
+    -- Add to notifications table
+    table.insert(notifications, notification)
+    
+    -- Slide in animation
+    local slideIn = game:GetService("TweenService"):Create(
+        notification,
+        TweenInfo.new(CONFIG.SlideInTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0.1, 0, 0, self:GetNotificationPosition(#notifications))}
+    )
+    slideIn:Play()
+    
+    -- Set up removal after duration
+    local removeConnection
+    removeConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not notification or not notification.Parent then
+            removeConnection:Disconnect()
+            return
+        end
+        
+        duration = duration - wait()
+        if duration <= 0 then
+            removeConnection:Disconnect()
+            self:RemoveNotification(notification)
+        end
+    end)
+    
+    return notification
+end
 
-    -- Dismiss button
-    if config.isDismissable then
-        local dismissButton = Instance.new("TextButton")
-        dismissButton.Size = UDim2.new(0, 32, 0, 32)
-        dismissButton.Position = UDim2.new(1, -40, 0, 10)
-        dismissButton.BackgroundColor3 = activeTheme.accent
-        dismissButton.BackgroundTransparency = 1
+-- Calculate position for notification based on index
+function NotificationService:GetNotificationPosition(index)
+    local position = CONFIG.Spacing
+    for i = 1, index - 1 do
+        if notifications[i] and notifications[i].Parent then
+            position = position + notifications[i].Size.Y.Offset + CONFIG.Spacing
+        end
+    end
+    return position
+end
+
+-- Remove notification with slide out animation
+function NotificationService:RemoveNotification(notification)
+    if not notification or not notification.Parent then return end
+    
+    -- Find notification index
+    local index
+    for i, notif in ipairs(notifications) do
+        if notif == notification then
+            index = i
+            break
+        end
+    end
+    
+    if not index then return end
+    
+    -- Slide out animation
+    local slideOut = game:GetService("TweenService"):Create(
+        notification,
+        TweenInfo.new(CONFIG.SlideOutTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {Position = UDim2.new(0.1, 0, 0, -notification.Size.Y.Offset)}
+    )
+    slideOut:Play()
+    
+    slideOut.Completed:Connect(function()
+        if notification and notification.Parent then
+            notification:Destroy()
+        end
+    end)
+    
+    -- Remove from table
+    table.remove(notifications, index)
+    
+    -- Update positions of remaining notifications
+    for i, notif in ipairs(notifications) do
+        if notif and notif.Parent then
+            local updatePos = game:GetService("TweenService"):Create(
+                notif,
+                TweenInfo.new(CONFIG.SlideOutTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {Position = UDim2.new(0.1, 0, 0, self:GetNotificationPosition(i))}
+            )
+            updatePos:Play()
+        end
+    end
+end
+
+-- Clear all notifications
+function NotificationService:ClearAll()
+    for i = #notifications, 1, -1 do
+        self:RemoveNotification(notifications[i])
+    end
+end
+
+-- Example usage and demo function
+function NotificationService:Demo()
+    -- Clear any existing notifications
+    self:ClearAll()
+    
+    -- Show some example notifications
+    self:CreateNotification(
+        "Message Received",
+        "Hey there! How are you doing today?",
+        "Messages",
+        5,
+        "rbxassetid://3926305904", -- Example icon
+        function()
+            print("Message notification clicked!")
+        end
+    )
+    
+    wait(1.5)
+    
+    self:CreateNotification(
+        "Game Update",
+        "New features have been added to the game!",
+        "Game",
+        5,
+        "rbxassetid://3926305904", -- Example icon
+        function()
+            print("Game notification clicked!")
+        end
+    )
+    
+    wait(2)
+    
+    self:CreateNotification(
+        "Reminder",
+        "Don't forget to complete your daily tasks!",
+        "Reminders",
+        5,
+        "rbxassetid://3926305904", -- Example icon
+        function()
+            print("Reminder notification clicked!")
+        end
+    )
+end
+
+return NotificationServicearency = 1
         dismissButton.Text = "✖"
         dismissButton.Font = Enum.Font.FredokaOne
         dismissButton.TextSize = 16
