@@ -1,70 +1,86 @@
-local NotificationService = {}
+local NotificationSystem = {}
 
 -- Configuration
-local CONFIG = {
-    Duration = 5, -- Default duration in seconds
-    Spacing = 10, -- Space between notifications
-    MaxNotifications = 4, -- Maximum number of notifications on screen
-    SlideInTime = 0.3, -- Time to slide in (seconds)
-    SlideOutTime = 0.5, -- Time to slide out (seconds)
+NotificationSystem.Config = {
+    Duration = 5,
+    Spacing = 10,
+    MaxOnScreen = 4,
+    SlideInTime = 0.3,
+    SlideOutTime = 0.5,
     Colors = {
         Background = Color3.fromRGB(40, 40, 40),
         Text = Color3.fromRGB(255, 255, 255),
         TimeText = Color3.fromRGB(180, 180, 180),
         AppName = Color3.fromRGB(0, 122, 255),
-        Border = Color3.fromRGB(80, 80, 80)
+        Border = Color3.fromRGB(80, 80, 80),
+        Shadow = Color3.fromRGB(0, 0, 0)
     }
 }
 
 -- Internal variables
-local notifications = {}
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "iPhoneNotifications"
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+NotificationSystem.ActiveNotifications = {}
+NotificationSystem.NotificationGui = nil
 
--- Create notification frame function
-function NotificationService:CreateNotification(title, message, appName, duration, icon, callback)
-    duration = duration or CONFIG.Duration
+-- Create the GUI container
+function NotificationSystem:Initialize()
+    if self.NotificationGui and self.NotificationGui.Parent then
+        self.NotificationGui:Destroy()
+    end
     
-    -- Create notification frame
+    self.NotificationGui = Instance.new("ScreenGui")
+    self.NotificationGui.Name = "iPhoneNotifications"
+    self.NotificationGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    self.NotificationGui.DisplayOrder = 10
+    self.NotificationGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    
+    self.ActiveNotifications = {}
+end
+
+-- Create and show a notification
+function NotificationSystem:Notify(title, message, options)
+    if not self.NotificationGui then
+        self:Initialize()
+    end
+    
+    options = options or {}
+    local duration = options.Duration or self.Config.Duration
+    local appName = options.App or "System"
+    local icon = options.Icon or ""
+    local callback = options.Callback
+    
     local notification = Instance.new("Frame")
     notification.Name = "iPhoneNotification"
     notification.Size = UDim2.new(0.8, 0, 0, 80)
     notification.Position = UDim2.new(0.1, 0, 0, -notification.Size.Y.Offset)
     notification.AnchorPoint = Vector2.new(0, 0)
-    notification.BackgroundColor3 = CONFIG.Colors.Background
+    notification.BackgroundColor3 = self.Config.Colors.Background
     notification.BorderSizePixel = 0
     notification.ClipsDescendants = true
     notification.ZIndex = 10
     
-    -- Add rounded corners
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 14)
     corner.Parent = notification
     
-    -- Add subtle border
     local stroke = Instance.new("UIStroke")
-    stroke.Color = CONFIG.Colors.Border
+    stroke.Color = self.Config.Colors.Border
     stroke.Thickness = 1
     stroke.Parent = notification
     
-    -- Add shadow
     local shadow = Instance.new("ImageLabel")
     shadow.Name = "Shadow"
     shadow.Size = UDim2.new(1, 10, 1, 10)
     shadow.Position = UDim2.new(0, -5, 0, -5)
     shadow.BackgroundTransparency = 1
     shadow.Image = "rbxassetid://1316045217"
-    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageColor3 = self.Config.Colors.Shadow
     shadow.ImageTransparency = 0.8
     shadow.ScaleType = Enum.ScaleType.Slice
     shadow.SliceCenter = Rect.new(10, 10, 118, 118)
     shadow.ZIndex = 9
     shadow.Parent = notification
     
-    -- Create icon
-    if icon then
+    if icon ~= "" then
         local iconImage = Instance.new("ImageLabel")
         iconImage.Name = "Icon"
         iconImage.Size = UDim2.new(0, 50, 0, 50)
@@ -75,21 +91,19 @@ function NotificationService:CreateNotification(title, message, appName, duratio
         iconImage.Parent = notification
     end
     
-    -- Create app name label
     local appLabel = Instance.new("TextLabel")
     appLabel.Name = "AppName"
     appLabel.Size = UDim2.new(0.7, -60, 0, 20)
-    appLabel.Position = UDim2.new(0, icon and 75 or 15, 0, 15)
+    appLabel.Position = UDim2.new(0, icon ~= "" and 75 or 15, 0, 15)
     appLabel.BackgroundTransparency = 1
-    appLabel.Text = appName or "App"
-    appLabel.TextColor3 = CONFIG.Colors.AppName
+    appLabel.Text = appName
+    appLabel.TextColor3 = self.Config.Colors.AppName
     appLabel.TextSize = 14
     appLabel.TextXAlignment = Enum.TextXAlignment.Left
     appLabel.Font = Enum.Font.SourceSansSemibold
     appLabel.ZIndex = 11
     appLabel.Parent = notification
     
-    -- Create time label
     local timeLabel = Instance.new("TextLabel")
     timeLabel.Name = "Time"
     timeLabel.Size = UDim2.new(0.2, 0, 0, 20)
@@ -97,35 +111,33 @@ function NotificationService:CreateNotification(title, message, appName, duratio
     timeLabel.AnchorPoint = Vector2.new(1, 0)
     timeLabel.BackgroundTransparency = 1
     timeLabel.Text = os.date("%H:%M")
-    timeLabel.TextColor3 = CONFIG.Colors.TimeText
+    timeLabel.TextColor3 = self.Config.Colors.TimeText
     timeLabel.TextSize = 14
     timeLabel.TextXAlignment = Enum.TextXAlignment.Right
     timeLabel.Font = Enum.Font.SourceSans
     timeLabel.ZIndex = 11
     timeLabel.Parent = notification
     
-    -- Create title label
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Name = "Title"
     titleLabel.Size = UDim2.new(0.95, -60, 0, 20)
-    titleLabel.Position = UDim2.new(0, icon and 75 or 15, 0, 35)
+    titleLabel.Position = UDim2.new(0, icon ~= "" and 75 or 15, 0, 35)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = title or "Notification"
-    titleLabel.TextColor3 = CONFIG.Colors.Text
+    titleLabel.TextColor3 = self.Config.Colors.Text
     titleLabel.TextSize = 16
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Font = Enum.Font.SourceSansSemibold
     titleLabel.ZIndex = 11
     titleLabel.Parent = notification
     
-    -- Create message label
     local messageLabel = Instance.new("TextLabel")
     messageLabel.Name = "Message"
     messageLabel.Size = UDim2.new(0.95, -60, 0, 20)
-    messageLabel.Position = UDim2.new(0, icon and 75 or 15, 0, 55)
+    messageLabel.Position = UDim2.new(0, icon ~= "" and 75 or 15, 0, 55)
     messageLabel.BackgroundTransparency = 1
     messageLabel.Text = message or ""
-    messageLabel.TextColor3 = CONFIG.Colors.Text
+    messageLabel.TextColor3 = self.Config.Colors.Text
     messageLabel.TextSize = 14
     messageLabel.TextXAlignment = Enum.TextXAlignment.Left
     messageLabel.TextYAlignment = Enum.TextYAlignment.Top
@@ -133,13 +145,11 @@ function NotificationService:CreateNotification(title, message, appName, duratio
     messageLabel.ZIndex = 11
     messageLabel.Parent = notification
     
-    -- Auto-size for multi-line messages
     if string.len(message or "") > 30 then
         messageLabel.Size = UDim2.new(0.95, -60, 0, 40)
         notification.Size = UDim2.new(0.8, 0, 0, 100)
     end
     
-    -- Make notification clickable if callback provided
     if callback then
         notification.BackgroundTransparency = 0.05
         
@@ -157,31 +167,26 @@ function NotificationService:CreateNotification(title, message, appName, duratio
         end)
     end
     
-    -- Add to screen
-    notification.Parent = screenGui
+    notification.Parent = self.NotificationGui
+    table.insert(self.ActiveNotifications, notification)
     
-    -- Add to notifications table
-    table.insert(notifications, notification)
-    
-    -- Slide in animation
     local slideIn = game:GetService("TweenService"):Create(
         notification,
-        TweenInfo.new(CONFIG.SlideInTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Position = UDim2.new(0.1, 0, 0, self:GetNotificationPosition(#notifications))}
+        TweenInfo.new(self.Config.SlideInTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0.1, 0, 0, self:GetNotificationPosition(#self.ActiveNotifications))}
     )
     slideIn:Play()
     
-    -- Set up removal after duration
     local removeConnection
     removeConnection = game:GetService("RunService").Heartbeat:Connect(function()
         if not notification or not notification.Parent then
-            removeConnection:Disconnect()
+            if removeConnection then removeConnection:Disconnect() end
             return
         end
         
         duration = duration - wait()
         if duration <= 0 then
-            removeConnection:Disconnect()
+            if removeConnection then removeConnection:Disconnect() end
             self:RemoveNotification(notification)
         end
     end)
@@ -189,24 +194,21 @@ function NotificationService:CreateNotification(title, message, appName, duratio
     return notification
 end
 
--- Calculate position for notification based on index
-function NotificationService:GetNotificationPosition(index)
-    local position = CONFIG.Spacing
+function NotificationSystem:GetNotificationPosition(index)
+    local position = self.Config.Spacing
     for i = 1, index - 1 do
-        if notifications[i] and notifications[i].Parent then
-            position = position + notifications[i].Size.Y.Offset + CONFIG.Spacing
+        if self.ActiveNotifications[i] and self.ActiveNotifications[i].Parent then
+            position = position + self.ActiveNotifications[i].Size.Y.Offset + self.Config.Spacing
         end
     end
     return position
 end
 
--- Remove notification with slide out animation
-function NotificationService:RemoveNotification(notification)
+function NotificationSystem:RemoveNotification(notification)
     if not notification or not notification.Parent then return end
     
-    -- Find notification index
     local index
-    for i, notif in ipairs(notifications) do
+    for i, notif in ipairs(self.ActiveNotifications) do
         if notif == notification then
             index = i
             break
@@ -215,29 +217,24 @@ function NotificationService:RemoveNotification(notification)
     
     if not index then return end
     
-    -- Slide out animation
     local slideOut = game:GetService("TweenService"):Create(
         notification,
-        TweenInfo.new(CONFIG.SlideOutTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        TweenInfo.new(self.Config.SlideOutTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
         {Position = UDim2.new(0.1, 0, 0, -notification.Size.Y.Offset)}
     )
     slideOut:Play()
     
     slideOut.Completed:Connect(function()
-        if notification and notification.Parent then
-            notification:Destroy()
-        end
+        if notification and notification.Parent then notification:Destroy() end
     end)
     
-    -- Remove from table
-    table.remove(notifications, index)
+    table.remove(self.ActiveNotifications, index)
     
-    -- Update positions of remaining notifications
-    for i, notif in ipairs(notifications) do
+    for i, notif in ipairs(self.ActiveNotifications) do
         if notif and notif.Parent then
             local updatePos = game:GetService("TweenService"):Create(
                 notif,
-                TweenInfo.new(CONFIG.SlideOutTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                TweenInfo.new(self.Config.SlideOutTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                 {Position = UDim2.new(0.1, 0, 0, self:GetNotificationPosition(i))}
             )
             updatePos:Play()
@@ -245,1155 +242,60 @@ function NotificationService:RemoveNotification(notification)
     end
 end
 
--- Clear all notifications
-function NotificationService:ClearAll()
-    for i = #notifications, 1, -1 do
-        self:RemoveNotification(notifications[i])
+function NotificationSystem:ClearAll()
+    for i = #self.ActiveNotifications, 1, -1 do
+        self:RemoveNotification(self.ActiveNotifications[i])
     end
 end
 
--- Example usage and demo function
-function NotificationService:Demo()
-    -- Clear any existing notifications
+function NotificationSystem:Demo()
     self:ClearAll()
     
-    -- Show some example notifications
-    self:CreateNotification(
+    self:Notify(
         "Message Received",
         "Hey there! How are you doing today?",
-        "Messages",
-        5,
-        "rbxassetid://3926305904", -- Example icon
-        function()
-            print("Message notification clicked!")
-        end
+        {
+            App = "Messages",
+            Duration = 5,
+            Icon = "rbxassetid://3926305904",
+            Callback = function() print("Message notification clicked!") end
+        }
     )
     
     wait(1.5)
     
-    self:CreateNotification(
+    self:Notify(
         "Game Update",
-        "New features have been added to the game!",
-        "Game",
-        5,
-        "rbxassetid://3926305904", -- Example icon
-        function()
-            print("Game notification clicked!")
-        end
+        "New features have been added to the game! Check them out now.",
+        {
+            App = "Game",
+            Duration = 5,
+            Icon = "rbxassetid://3926307971",
+            Callback = function() print("Game notification clicked!") end
+        }
     )
     
     wait(2)
     
-    self:CreateNotification(
+    self:Notify(
         "Reminder",
         "Don't forget to complete your daily tasks!",
-        "Reminders",
-        5,
-        "rbxassetid://3926305904", -- Example icon
-        function()
-            print("Reminder notification clicked!")
-        end
+        {
+            App = "Reminders",
+            Duration = 5,
+            Icon = "rbxassetid://3926305904",
+            Callback = function() print("Reminder notification clicked!") end
+        }
     )
 end
 
-return NotificationServicearency = 1
-        dismissButton.Text = "✖"
-        dismissButton.Font = Enum.Font.FredokaOne
-        dismissButton.TextSize = 16
-        dismissButton.TextColor3 = activeTheme.text
-        dismissButton.TextTransparency = 1
-        local buttonCorner = Instance.new("UICorner")
-        buttonCorner.CornerRadius = UDim.new(0, 8)
-        buttonCorner.Parent = dismissButton
-        dismissButton.Parent = bgFrame
-    end
+NotificationSystem:Initialize()
 
-    notification.Parent = notificationFrame
+-- Add to global namespace for easy access
+getgenv().iPhoneNotifications = NotificationSystem
 
-    -- Animations
-    notification.Position = UDim2.new(1.5, 0, 0, 0)
-    local slideIn = TweenService:Create(notification, TweenInfo.new(0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)})
-    local bgFadeIn = TweenService:Create(bgFrame, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0})
-    local iconFadeIn = TweenService:Create(icon, TweenInfo.new(0.7, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {ImageTransparency = 0})
-    local iconScale = TweenService:Create(icon, TweenInfo.new(0.7, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {Size = UDim2.new(0, 60, 0, 60)})
-    local titleFadeIn = TweenService:Create(titleLabel, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0})
-    local descFadeIn = TweenService:Create(descriptionLabel, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {TextTransparency = 0})
+-- Auto demo (optional - remove if you don't want demo notifications on load)
+wait(1)
+iPhoneNotifications:Demo()
 
-    -- Play sound and animations
-    playSound(activeTheme.sound)
-    if config.glowEffect then
-        addParticleEffect(bgFrame, activeTheme.particleColor)
-    end
-    slideIn:Play()
-    bgFadeIn:Play()
-    iconFadeIn:Play()
-    iconScale:Play()
-    titleFadeIn:Play()
-    descFadeIn:Play()
-
-    -- Dismiss logic
-    local function dismissNotification()
-        local slideOut = TweenService:Create(notification, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Position = UDim2.new(1.5, 0, 0, 0)})
-        local bgFadeOut = TweenService:Create(bgFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundTransparency = 1})
-        local iconFadeOut = TweenService:Create(icon, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {ImageTransparency = 1})
-        local iconShrink = TweenService:Create(icon, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
-        local titleFadeOut = TweenService:Create(titleLabel, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {TextTransparency = 1})
-        local descFadeOut = TweenService:Create(descriptionLabel, TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {TextTransparency = 1})
-
-        slideOut:Play()
-        bgFadeOut:Play()
-        iconFadeOut:Play()
-        iconShrink:Play()
-        titleFadeOut:Play()
-        descFadeOut:Play()
-
-        slideOut.Completed:Connect(function()
-            notification:Destroy()
-        end)
-    end
-
-    -- Dismiss button setup
-    if config.isDismissable then
-        local dismissButton = bgFrame:FindFirstChildOfClass("TextButton")
-        if dismissButton then
-            local buttonFadeIn = TweenService:Create(dismissButton, TweenInfo.new(0.7, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0})
-            buttonFadeIn:Play()
-            dismissButton.MouseButton1Click:Connect(dismissNotification)
-            dismissButton.MouseEnter:Connect(function()
-                TweenService:Create(dismissButton, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundColor3 = activeTheme.accent:Lerp(Color3.new(1, 1, 1), 0.2)}):Play()
-            end)
-            dismissButton.MouseLeave:Connect(function()
-                TweenService:Create(dismissButton, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundColor3 = activeTheme.accent}):Play()
-            end)
-        end
-    end
-
-    -- Auto-dismiss
-    if config.duration > 0 then
-        task.spawn(function()
-            task.wait(config.duration)
-            if notification.Parent then
-                dismissNotification()
-            end
-        end)
-    end
-
-    -- Hover effect
-    notification.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            TweenService:Create(bgFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundColor3 = activeTheme.bg:Lerp(Color3.new(1, 1, 1), 0.15)}):Play()
-            TweenService:Create(notification, TweenInfo.new(0.3, Enum.EasingStyle.Elastic), {Size = UDim2.new(1, 0, 0, 110)}):Play()
-        end)
-    end)
-    notification.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            TweenService:Create(bgFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundColor3 = activeTheme.bg}):Play()
-            TweenService:Create(notification, TweenInfo.new(0.3, Enum.EasingStyle.Elastic), {Size = UDim2.new(1, 0, 0, 100)}):Play()
-        end)
-    end)
-end
-
--- Return the Notify function for loadstring compatibility
-return getgenv().NotifySettings.OnDismissCallback() end
-            UpdateQueuePositions()
-        end)
-    end
-
-    local frame, settings, progressBar = CreateNotificationUI(options)
-    local notif = {Frame = frame, Settings = settings}
-    table.insert(ActiveNotifications, notif)
-    UpdateQueuePositions()
-
-    if settings.SoundId then
-        local sound = Instance.new("Sound")
-        sound.SoundId = settings.SoundId
-        sound.Volume = 0.5
-        sound.Parent = SoundService
-        sound:Play()
-        sound.Ended:Connect(function() sound:Destroy() end)
-    end
-
-    AnimateIn(frame, settings)
-
-    if progressBar then
-        local fill = progressBar:FindFirstChildOfClass("Frame")
-        TweenService:Create(progressBar, TweenInfo.new(settings.FadeInTime), {BackgroundTransparency = 0}):Play()
-        TweenService:Create(fill, TweenInfo.new(settings.Duration, Enum.EasingStyle.Linear), {Size = UDim2.new(0, 0, 1, 0)}):Play()
-    end
-
-    task.delay(settings.Duration, function()
-        if frame.Parent then
-            AnimateOut(frame, settings, function()
-                local index = table.find(ActiveNotifications, notif)
-                if index then table.remove(ActiveNotifications, index) end
-                UpdateQueuePositions()
-                if settings.OnDismissCallback then settings.OnDismissCallback() end
-            end)
-        end
-    end)
-end
-
--- Clear all notifications
-function NotificationLibrary:ClearAll()
-    for _, notif in ipairs(ActiveNotifications) do
-        AnimateOut(notif.Frame, notif.Settings, function()
-            if notif.Settings.OnDismissCallback then notif.Settings.OnDismissCallback() end
-        end)
-    end
-    ActiveNotifications = {}
-end
-
-return NotificationLibrary= UDim2.new(0, 400, 0, 300)}):Play()
-        wait(1)
-    end
-end)
-
--- AM: Proximity parallax
-RunService.RenderStepped:Connect(function()
-    local mousePos = UserInputService:GetMouseLocation()
-    local center = MainFrame.AbsolutePosition + MainFrame.AbsoluteSize / 2
-    local offset = (mousePos - center) / 1000
-    MainFrame.Position = UDim2.new(0.5, -200 - offset.X, 0.5, -150 - offset.Y)
-end)
-
--- AN: Theming system
-local function ApplyTheme(theme)
-    if theme == "Dark" then
-        MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        VerifyButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-    elseif theme == "Light" then
-        MainFrame.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-        VerifyButton.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-    elseif theme == "Autumn" then
-        MainFrame.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
-        VerifyButton.BackgroundColor3 = Color3.fromRGB(150, 50, 0)
-    end
-end
-ApplyTheme(getgenv().KeySystemConfig.Theme)
-
--- AQ: Loading tips
-local TipLabel = Instance.new("TextLabel")
-TipLabel.Size = UDim2.new(0.8, 0, 0, 20)
-TipLabel.Position = UDim2.new(0.1, 0, 0.75, 0)
-TipLabel.BackgroundTransparency = 1
-TipLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TipLabel.TextSize = 14
-TipLabel.Font = Enum.Font.Gotham
-TipLabel.Parent = MainFrame
-spawn(function()
-    while MainFrame.Parent do
-        TipLabel.Text = getgenv().KeySystemConfig.Tips[math.random(1, #getgenv().KeySystemConfig.Tips)]
-        wait(2)
-    end
-end)
-
--- I: Check saved key
-local savedKey = KeyDataStore:GetAsync(Player.UserId .. "_Key")
-if savedKey and table.find(getgenv().KeySystemConfig.ValidKeys, savedKey) then
-    SuccessAnimation()
-end
-
--- AT: Anti-tamper
-if not pcall(function() return game:GetService("CoreGui") end) then
-    ScreenGui:Destroy()
-    BlurEffect:Destroy()
-end
-
--- AU: Auto-scale on resolution change
-GuiService:GetPropertyChangedSignal("ScreenResolution"):Connect(function()
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-end)
-
--- AV: Tooltips
-local function CreateTooltip(element, text)
-    local Tooltip = Instance.new("TextLabel")
-    Tooltip.Size = UDim2.new(0, 150, 0, 30)
-    Tooltip.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    Tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Tooltip.Text = text
-    Tooltip.TextSize = 12
-    Tooltip.Visible = false
-    Tooltip.Parent = ScreenGui
-    element.MouseEnter:Connect(function()
-        Tooltip.Position = UDim2.new(0, UserInputService:GetMouseLocation().X, 0, UserInputService:GetMouseLocation().Y - 40)
-        Tooltip.Visible = true
-    end)
-    element.MouseLeave:Connect(function() Tooltip.Visible = false end)
-end
-CreateTooltip(KeyInput, "Enter your key here")
-CreateTooltip(VerifyButton, "Click to verify key")
-CreateTooltip(CopyKeyButton, "Copy the entered key")
-CreateTooltip(GetKeyButton, "Get a new key")
-
--- AD: Return KeySystem module
-return {
-    KeySystem = {
-        Verify = VerifyKey,
-        Config = getgenv().KeySystemConfig
-    }
-}"
-    KeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    KeyButton.TextSize = 14
-    KeyButton.Font = Enum.Font.GothamBold
-    KeyButton.Parent = KeyFrame
-    local KeyButtonUICorner = Instance.new("UICorner")
-    KeyButtonUICorner.CornerRadius = UDim.new(0, 8)
-    KeyButtonUICorner.Parent = KeyButton
-    animateButton(KeyButton)
-
-    local KeyLink = Instance.new("TextButton")
-    KeyLink.Size = UDim2.new(1, -20, 0, 30)
-    KeyLink.Position = UDim2.new(0, 10, 0, 110)
-    KeyLink.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    KeyLink.Text = "Get Key"
-    KeyLink.TextColor3 = Color3.fromRGB(255, 255, 255)
-    KeyLink.TextSize = 14
-    KeyLink.Font = Enum.Font.GothamBold
-    KeyLink.Parent = KeyFrame
-    local KeyLinkUICorner = Instance.new("UICorner")
-    KeyLinkUICorner.CornerRadius = UDim.new(0, 8)
-    KeyLinkUICorner.Parent = KeyLink
-    animateButton(KeyLink)
-    if AutoCopyLink then
-        setclipboard("https://example.com/getkey")
-        CleanUI:Notify("Link Copied", "The key link has been copied to your clipboard!", 3)
-    end
-    KeyLink.MouseButton1Click:Connect(function()
-        setclipboard("https://example.com/getkey")
-        CleanUI:Notify("Link Copied", "The key link has been copied to your clipboard!", 3)
-    end)
-
-    local keyVerified = not KeySystemEnabled
-    KeyButton.MouseButton1Click:Connect(function()
-        if KeyBox.Text == "validkey" or not KeySystemEnabled then -- Replace "validkey" with your key
-            keyVerified = true
-            TweenService:Create(KeyFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-            for _, child in ipairs(KeyFrame:GetChildren()) do
-                TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-            end
-            wait(0.5)
-            KeyFrame.Visible = false
-            MainFrame.Visible = true
-            CleanUI:Notify("Success", "Key verified successfully!", 3)
-        else
-            CleanUI:Notify("Error", "Invalid key entered.", 3)
-        end
-    end)
-
-    -- Loading Screen
-    local LoadingFrame = Instance.new("Frame")
-    LoadingFrame.Size = UDim2.new(0, 200, 0, 100)
-    LoadingFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
-    LoadingFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    LoadingFrame.BorderSizePixel = 0
-    LoadingFrame.Parent = ScreenGui
-    local LoadingUICorner = Instance.new("UICorner")
-    LoadingUICorner.CornerRadius = UDim.new(0, 12)
-    LoadingUICorner.Parent = LoadingFrame
-
-    local LoadingLabel = Instance.new("TextLabel")
-    LoadingLabel.Size = UDim2.new(1, 0, 0, 30)
-    LoadingLabel.Position = UDim2.new(0, 0, 0, 10)
-    LoadingLabel.BackgroundTransparency = 1
-    LoadingLabel.Text = "Loading CleanUI..."
-    LoadingLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    LoadingLabel.TextSize = 16
-    LoadingLabel.Font = Enum.Font.GothamBold
-    LoadingLabel.Parent = LoadingFrame
-
-    local LoadingBar = Instance.new("Frame")
-    LoadingBar.Size = UDim2.new(0.8, 0, 0, 20)
-    LoadingBar.Position = UDim2.new(0.1, 0, 0, 50)
-    LoadingBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    LoadingBar.Parent = LoadingFrame
-    local LoadingBarUICorner = Instance.new("UICorner")
-    LoadingBarUICorner.CornerRadius = UDim.new(0, 8)
-    LoadingBarUICorner.Parent = LoadingBar
-
-    local LoadingProgress = Instance.new("Frame")
-    LoadingProgress.Size = UDim2.new(0, 0, 1, 0)
-    LoadingProgress.BackgroundColor3 = windowConfig.PrimaryColor
-    LoadingProgress.Parent = LoadingBar
-    local LoadingProgressUICorner = Instance.new("UICorner")
-    LoadingProgressUICorner.CornerRadius = UDim.new(0, 8)
-    LoadingProgressUICorner.Parent = LoadingProgress
-
-    MainFrame.Visible = not KeySystemEnabled
-    KeyFrame.Visible = KeySystemEnabled
-    LoadingFrame.Visible = true
-    TweenService:Create(LoadingProgress, TweenInfo.new(2), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-    wait(2)
-    TweenService:Create(LoadingFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
-    for _, child in ipairs(LoadingFrame:GetChildren()) do
-        TweenService:Create(child, TweenInfo.new(0.5), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-    end
-    wait(0.5)
-    LoadingFrame.Visible = false
-
-    -- Tab Creation
-    function CleanUI:CreateTab(tabConfig)
-        local tab = {
-            Name = tabConfig.Name or "Tab",
-            Icon = tabConfig.Icon or "📋"
-        }
-        local TabButton = Instance.new("TextButton")
-        TabButton.Size = UDim2.new(1, -10, 0, 30)
-        TabButton.Position = UDim2.new(0, 5, 0, 5)
-        TabButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        TabButton.Text = tab.Icon .. " " .. tab.Name
-        TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        TabButton.TextSize = 14
-        TabButton.Font = Enum.Font.Gotham
-        TabButton.Parent = TabContainer
-        local TabButtonUICorner = Instance.new("UICorner")
-        TabButtonUICorner.CornerRadius = UDim.new(0, 8)
-        TabButtonUICorner.Parent = TabButton
-
-        local TabContent = Instance.new("Frame")
-        TabContent.Size = UDim2.new(1, 0, 1, 0)
-        TabContent.BackgroundTransparency = 1
-        TabContent.Parent = ContentArea
-        TabContent.Visible = false
-        local TabContentList = Instance.new("UIListLayout")
-        TabContentList.Padding = UDim.new(0, 10)
-        TabContentList.Parent = TabContent
-
-        Tabs[tab.Name] = {Button = TabButton, Content = TabContent}
-        TabButton.MouseButton1Click:Connect(function()
-            for _, t in pairs(Tabs) do
-                t.Content.Visible = false
-                TweenService:Create(t.Button, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(50, 50, 50)}):Play()
-            end
-            TabContent.Visible = true
-            TweenService:Create(TabButton, TweenInfo.new(0.3), {BackgroundColor3 = windowConfig.PrimaryColor}):Play()
-        end)
-        if not Tabs.active then
-            Tabs.active = tab.Name
-            TabContent.Visible = true
-            TabButton.BackgroundColor3 = windowConfig.PrimaryColor
-        end
-
-        -- Component Methods
-        local Components = {}
-
-        function Components:Button(config)
-            local button = Instance.new("TextButton")
-            button.Size = UDim2.new(1, -20, 0, 30)
-            button.Position = UDim2.new(0, 10, 0, 0)
-            button.BackgroundColor3 = windowConfig.PrimaryColor
-            button.Text = config.Text or "Button"
-            button.TextColor3 = Color3.fromRGB(255, 255, 255)
-            button.TextSize = 14
-            button.Font = Enum.Font.Gotham
-            button.Parent = TabContent
-            local ButtonUICorner = Instance.new("UICorner")
-            ButtonUICorner.CornerRadius = UDim.new(0, 8)
-            ButtonUICorner.Parent = button
-            button.MouseButton1Click:Connect(function()
-                if config.Callback then
-                    config.Callback()
-                end
-            end)
-            animateButton(button)
-        end
-
-        function Components:Toggle(config)
-            local toggleFrame = Instance.new("Frame")
-            toggleFrame.Size = UDim2.new(1, -20, 0, 30)
-            toggleFrame.Position = UDim2.new(0, 10, 0, 0)
-            toggleFrame.BackgroundTransparency = 1
-            toggleFrame.Parent = TabContent
-
-            local toggleLabel = Instance.new("TextLabel")
-            toggleLabel.Size = UDim2.new(0.8, 0, 1, 0)
-            toggleLabel.BackgroundTransparency = 1
-            toggleLabel.Text = config.Text or "Toggle"
-            toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            toggleLabel.TextSize = 14
-            toggleLabel.Font = Enum.Font.Gotham
-            toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            toggleLabel.Parent = toggleFrame
-
-            local toggleButton = Instance.new("Frame")
-            toggleButton.Size = UDim2.new(0, 40, 0, 20)
-            toggleButton.Position = UDim2.new(1, -40, 0, 5)
-            toggleButton.BackgroundColor3 = config.Default and windowConfig.PrimaryColor or Color3.fromRGB(100, 100, 100)
-            toggleButton.Parent = toggleFrame
-            local ToggleUICorner = Instance.new("UICorner")
-            ToggleUICorner.CornerRadius = UDim.new(0, 10)
-            ToggleUICorner.Parent = toggleButton
-
-            local toggleCircle = Instance.new("Frame")
-            toggleCircle.Size = UDim2.new(0, 16, 0, 16)
-            toggleCircle.Position = config.Default and UDim2.new(1, -18, 0, 2) or UDim2.new(0, 2, 0, 2)
-            toggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            toggleCircle.Parent = toggleButton
-            local CircleUICorner = Instance.new("UICorner")
-            CircleUICorner.CornerRadius = UDim.new(0, 10)
-            CircleUICorner.Parent = toggleCircle
-
-            local toggled = config.Default or false
-            toggleButton.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    toggled = not toggled
-                    TweenService:Create(toggleCircle, TweenInfo.new(0.3), {Position = toggled and UDim2.new(1, -18, 0, 2) or UDim2.new(0, 2, 0, 2)}):Play()
-                    TweenService:Create(toggleButton, TweenInfo.new(0.3), {BackgroundColor3 = toggled and windowConfig.PrimaryColor or Color3.fromRGB(100, 100, 100)}):Play()
-                    if config.Callback then
-                        config.Callback(toggled)
-                    end
-                end
-            end)
-        end
-
-        function Components:TextBox(config)
-                        Textbox.Text = Default or Text or ""
-            Textbox.PlaceholderText = Text or "Enter text..."
-            Textbox.TextColor3 = Color3.fromRGB(255, 255, 255)
-            Textbox.TextSize = 18
-            Textbox.Font = Enum.Font.Arcade
-            Textbox.Parent = Tab.Frame
-
-            local Corner = Instance.new("UICorner")
-            Corner.CornerRadius = UDim.new(0, 10)
-            Corner.Parent = Textbox
-
-            local Stroke = Instance.new("UIStroke")
-            Stroke.Color = Color3.fromRGB(0, 255, 255)
-            Stroke.Thickness = 1.5
-            Stroke.Transparency = 0.5
-            Stroke.Parent = Textbox
-
-            Textbox.Focused:Connect(function()
-                TweenService:Create(Stroke, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {Transparency = 0}):Play()
-            end)
-            Textbox.FocusLost:Connect(function(enterPressed)
-                TweenService:Create(Stroke, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {Transparency = 0.5}):Play()
-                if enterPressed and Callback then
-                    Callback(Textbox.Text)
-                end
-            end)
-
-            Tab.NextPosition = Tab.NextPosition + UDim2.new(0, 0, 0, 55)
-            table.insert(Tab.Elements, Textbox)
-        end
-
-        function Tab:AddDropdown(Text, Options, Default, Callback)
-            local Dropdown = Instance.new("Frame")
-            Dropdown.Size = UDim2.new(1, 0, 0, 45)
-            Dropdown.Position = Tab.NextPosition
-            Dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-            Dropdown.BackgroundTransparency = 0.2
-            Dropdown.Parent = Tab.Frame
-
-            local Corner = Instance.new("UICorner")
-            Corner.CornerRadius = UDim.new(0, 10)
-            Corner.Parent = Dropdown
-
-            local Stroke = Instance.new("UIStroke")
-            Stroke.Color = Color3.fromRGB(0, 255, 255)
-            Stroke.Thickness = 1.5
-            Stroke.Transparency = 0.5
-            Stroke.Parent = Dropdown
-
-            local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1, -40, 1, 0)
-            Label.Position = UDim2.new(0, 10, 0, 0)
-            Label.BackgroundTransparency = 1
-            Label.Text = Text or "Dropdown: " .. (Default or Options[1])
-            Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-            Label.TextSize = 18
-            Label.Font = Enum.Font.Arcade
-            Label.TextXAlignment = Enum.TextXAlignment.Left
-            Label.Parent = Dropdown
-
-            local DropdownButton = Instance.new("TextButton")
-            DropdownButton.Size = UDim2.new(0, 30, 0, 30)
-            DropdownButton.Position = UDim2.new(1, -35, 0, 7.5)
-            DropdownButton.BackgroundTransparency = 1
-            DropdownButton.Text = "▼"
-            DropdownButton.TextColor3 = Color3.fromRGB(0, 255, 255)
-            DropdownButton.TextSize = 16
-            DropdownButton.Font = Enum.Font.Arcade
-            DropdownButton.Parent = Dropdown
-
-            local OptionFrame = Instance.new("Frame")
-            OptionFrame.Size = UDim2.new(1, 0, 0, #Options * 40)
-            OptionFrame.Position = UDim2.new(0, 0, 1, 5)
-            OptionFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-            OptionFrame.BackgroundTransparency = 0.1
-            OptionFrame.Visible = false
-            OptionFrame.Parent = Dropdown
-
-            local OptionCorner = Instance.new("UICorner")
-            OptionCorner.CornerRadius = UDim.new(0, 10)
-            OptionCorner.Parent = OptionFrame
-
-            local OptionStroke = Instance.new("UIStroke")
-            OptionStroke.Color = Color3.fromRGB(0, 255, 255)
-            OptionStroke.Thickness = 1.5
-            OptionStroke.Transparency = 0.5
-            OptionStroke.Parent = OptionFrame
-
-            local OptionList = Instance.new("UIListLayout")
-            OptionList.SortState = not State
-            Toggle.Text = Text or "Toggle: " .. (State and "On" or "Off")
-            local targetColor = State and Color3.fromRGB(0, 255, 200) or Color3.fromRGB(40, 40, 40)
-            TweenService:Create(Toggle, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {BackgroundColor3 = targetColor, BackgroundTransparency = 0.2}):Play()
-            if Callback then
-                Callback(State)
-            end
-        end)
-
-        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 55)
-        table.insert(Window.Elements, Toggle)
-    end
-
-    function Window:AddSlider(Text, Min, Max, Default, Callback)
-        local Slider = Instance.new("Frame")
-        Slider.Size = UDim2.new(1, -40, 0, 60)
-        Slider.Position = Window.NextPosition
-        Slider.BackgroundTransparency = 1
-        Slider.Parent = Window.Frame
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(1, 0, 0, 20)
-        Label.BackgroundTransparency = 1
-        Label.Text = Text or "Slider: " .. (Default or Min)
-        Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Label.TextSize = 16
-        Label.Font = Enum.Font.SciFi
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = Slider
-
-        local SliderBar = Instance.new("Frame")
-        SliderBar.Size = UDim2.new(1, 0, 0, 10)
-        SliderBar.Position = UDim2.new(0, 0, 0, 30)
-        SliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        SliderBar.Parent = Slider
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 5)
-        Corner.Parent = SliderBar
-
-        local Fill = Instance.new("Frame")
-        Fill.Size = UDim2.new((Default - Min) / (Max - Min), 0, 1, 0)
-        Fill.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
-        Fill.Parent = SliderBar
-
-        local FillCorner = Instance.new("UICorner")
-        FillCorner.CornerRadius = UDim.new(0, 5)
-        FillCorner.Parent = Fill
-
-        local Value = Default or Min
-        local Dragging = false
-
-        SliderBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                Dragging = true
-            end
-        end)
-
-        SliderBar.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                Dragging = false
-            end
-        end)
-
-        RunService.RenderStepped:Connect(function()
-            if Dragging then
-                local mousePos = UserInputService:GetMouseLocation()
-                local relativeX = math.clamp((mousePos.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
-                Value = Min + (Max - Min) * relativeX
-                Value = math.floor(Value + 0.5)
-                Fill.Size = UDim2.new(relativeX, 0, 1, 0)
-                Label.Text = Text or "Slider: " .. Value
-                if Callback then
-                    Callback(Value)
-                end
-            end
-        end)
-
-        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 70)
-        table.insert(Window.Elements, Slider)
-    end
-
-    function Window:AddTextbox(Text, Default, Callback)
-        local Textbox = Instance.new("TextBox")
-        Textbox.Size = UDim2.new(1, -40, 0, 45)
-        Textbox.Position = Window.NextPosition
-        Textbox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        Textbox.BackgroundTransparency = 0.2
-        Textbox.Text = Default or Text or ""
-        Textbox.PlaceholderText = Text or "Enter text..."
-        Textbox.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Textbox.TextSize = 18
-        Textbox.Font = Enum.Font.SciFi
-        Textbox.Parent = Window.Frame
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 10)
-        Corner.Parent = Textbox
-
-        local Stroke = Instance.new("UIStroke")
-        Stroke.Color = Color3.fromRGB(0, 255, 200)
-        Stroke.Thickness = 1.5
-        Stroke.Transparency = 0.5
-        Stroke.Parent = Textbox
-
-        Textbox.FocusLost:Connect(function(enterPressed)
-            if enterPressed and Callback then
-                Callback(Textbox.Text)
-            end
-        end)
-
-        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 55)
-        table.insert(Window.Elements, Textbox)
-    end
-
-    function Window:AddDropdown(Text, Options, Default, Callback)
-        local Dropdown = Instance.new("Frame")
-        Dropdown.Size = UDim2.new(1, -40, 0, 45)
-        Dropdown.Position = Window.NextPosition
-        Dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        Dropdown.BackgroundTransparency = 0.2
-        Dropdown.Parent = Window.Frame
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 10)
-        Corner.Parent = Dropdown
-
-        local Stroke = Instance.new("UIStroke")
-        Stroke.Color = Color3.fromRGB(0, 255, 200)
-        Stroke.Thickness = 1.5
-        Stroke.Transparency = 0.5
-        Stroke.Parent = Dropdown
-
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(1, -30, 1, 0)
-        Label.Position = UDim2.new(0, 10, 0, 0)
-        Label.BackgroundTransparency = 1
-        Label.Text = Text or "Dropdown: " .. (Default or Options[1])
-        Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        Label.TextSize = 18
-        Label.Font = Enum.Font.SciFi
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.Parent = Dropdown
-
-        local DropdownButton = Instance.new("TextButton")
-        DropdownButton.Size = UDim2.new(0, 30, 0, 30)
-        DropdownButton.Position = UDim2.new(1, -35, 0, 7.5)
-        DropdownButton.BackgroundTransparency = 1
-        DropdownButton.Text = "▼"
-        DropdownButton.TextColor3 = Color3.fromRGB(0, 255, 200)
-        DropdownButton.TextSize = 16
-        DropdownButton.Font = Enum.Font.SciFi
-        DropdownButton.Parent = Dropdown
-
-        local OptionFrame = Instance.new("Frame")
-        OptionFrame.Size = UDim2.new(1, 0, 0, #Options * 40)
-        OptionFrame.Position = UDim2.new(0, 0, 1, 5)
-        OptionFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-        OptionFrame.BackgroundTransparency = 0.1
-        OptionFrame.Visible = false
-        OptionFrame.Parent = Dropdown
-
-        local OptionCorner = Instance.new("UICorner")
-        OptionCorner.CornerRadius = UDim.new(0, 10)
-        OptionCorner.Parent = OptionFrame
-
-        local OptionStroke = Instance.new("UIStroke")
-        OptionStroke.Color = Color3.fromRGB(0, 255, 200)
-        OptionStroke.Thickness = 1.5
-        OptionStroke.Transparency = 0.5
-        OptionStroke.Parent = OptionFrame
-
-        local OptionList = Instance.new("UIListLayout")
-        OptionList.SortOrder = Enum.SortOrder.LayoutOrder
-        OptionList.Parent = OptionFrame
-
-        local Selected = Default or Options[1]
-        for i, option in ipairs(Options) do
-            local OptionButton = Instance.new("TextButton")
-            OptionButton.Size = UDim2.new(1, 0, 0, 40)
-            OptionButton.BackgroundTransparency = 0.2
-            OptionButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            OptionButton.Text = option
-            OptionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-            OptionButton.TextSize = 16
-            OptionButton.Font = Enum.Font.SciFi
-            OptionButton.Parent = OptionFrame
-
-            local OptionButtonCorner = Instance.new("UICorner")
-            OptionButtonCorner.CornerRadius = UDim.new(0, 8)
-            OptionButtonCorner.Parent = OptionButton
-
-            OptionButton.MouseButton1Click:Connect(function()
-                Selected = option
-                Label.Text = Text or "Dropdown: " .. Selected
-                OptionFrame.Visible = false
-                if Callback then
-                    Callback(Selected)
-                end
-            end)
-        end
-
-        DropdownButton.MouseButton1Click:Connect(function()
-            OptionFrame.Visible = not OptionFrame.Visible
-            TweenService:Create(DropdownButton, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {Rotation = OptionFrame.Visible and 180 or 0}):Play()
-        end)
-
-        Window.NextPosition = Window.NextPosition + UDim2.new(0, 0, 0, 55)
-        table.insert(Window.Elements, Dropdown)
-    end
-
-    return Window
-end
-
--- Notify function with dynamic animation
-function NeptuneUI:Notify(Text, Duration)
-    local Notification = Instance.new("Frame")
-    Notification.Size = UDim2.new(0, 300, 0, 70)
-    Notification.Position = UDim2.new(1, 310, 1, -80)
-    Notification.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    Notification.BackgroundTransparency = 0.1
-    Notification.BorderSizePixel = 0
-    Notification.Parent = self.ScreenGui
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 12)
-    Corner.Parent = Notification
-
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(0, 255, 200)
-    Stroke.Thickness = 2
-    Stroke.Transparency = 0.3
-    Stroke.Parent = Notification
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -20, 1, 0)
-    Label.Position = UDim2.new(0, 10, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = Text or "Notification"
-    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Label.TextSize = 18
-    Label.Font = Enum.Font.SciFi
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.TextWrapped = true
-    Label.Parent = Notification
-
-    -- Slide-in animation
-    local tweenIn = TweenService:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(1, -310, 1, -80)})
-    tweenIn:Play()
-    tweenIn.Completed:Wait()
-
-    -- Slide-out animation
-    spawn(function()
-        wait(Duration or 3)
-        local tweenOut = TweenService:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), {Position = UDim2.new(1, 310, 1, -80)})
-    olor3.fromRGB(50, 50, 60),
-                    BorderSizePixel = 0
-                })
-                createInstance("UICorner", { CornerRadius = UDim.new(0, 6), Parent = toggleFrame })
-
-                local toggleLabel = createInstance("TextLabel", {
-                    Parent = toggleFrame,
-                    Size = UDim2.new(1, -50, 1, 0),
-                    Position = UDim2.new(0, 5, 0, 0),
-                    BackgroundTransparency = 1,
-                    Text = config.Title or "Toggle",
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    TextSize = 14,
-                    Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left
-                })
-
-                local toggleButton = createInstance("Frame", {
-                    Parent = toggleFrame,
-                    Size = UDim2.new(0, 40, 0, 20),
-                    Position = UDim2.new(1, -45, 0.5, -10),
-                    BackgroundColor3 = Color3.fromRGB(70, 70, 80),
-                    BorderSizePixel = 0
-                })
-                createInstance("UICorner", { CornerRadius = UDim.new(0, 10), Parent = toggleButton })
-
-                local toggleCircle = createInstance("Frame", {
-                    Parent = toggleButton,
-                    Size = UDim2.new(0, 16, 0, 16),
-                    Position = UDim2.new(0, 2, 0.5, -8),
-                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                    BorderSizePixel = 0
-                })
-                createInstance("UICorner", { CornerRadius = UDim.new(0, 8), Parent = toggleCircle })
-
-                local enabled = config.Default or false
-                if enabled then
-                    toggleCircle.Position = UDim2.new(1, -18, 0.5, -8)
-                    toggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-                end
-
-                toggleButton.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        enabled = not enabled
-                        createTween(toggleCircle, { Position = UDim2.new(enabled and 1 or 0, enabled and -18 or 2, 0.5, -8) }, 0.3, Enum.EasingStyle.Quad)
-                        createTween(toggleButton, { BackgroundColor3 = enabled and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(70, 70, 80) }, 0.3)
-                        if config.Callback then
-                            config.Callback(enabled)
-                        end
-                    end
-                end)
-                updateSectionHeight()
-
-                toggle.Set = function(value)
-                    enabled = value
-                    createTween(toggleCircle, { Position = UDim2.new(enabled and 1 or 0, enabled and -18 or 2, 0.5, -8) }, 0.3)
-                    createTween(toggleButton, { BackgroundColor3 = enabled and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(70, 70, 80) }, 0.3)
-                    if config.Callback then
-                        config.Callback(enabled)
-                    end
-                end
-                return toggle
-            end
-
-            -- Slider
-            function section:AddSlider(config)
-                local slider = {}
-                local min, max, default = config.Min or 0, config.Max or 100, config.Default or 50
-                local sliderFrame = createInstance("Frame", {
-                    Parent = section,
-                    Size = UDim2.new(1, -10, 0, 50),
-                    BackgroundColor3 = Color3.fromRGB(50, 50, 60),
-                    BorderSizePixel = 0
-                })
-                createInstance("UICorner", { CornerRadius = UDim.new(0, 6), Parent = sliderFrame })
-
-                local sliderLabel = createInstance("TextLabel", {
-                    Parent = sliderFrame,
-                    Size = UDim2.new(1, -10, 0, 20),
-                    Position = UDim2.new(0, 5, 0, 5),
-                    BackgroundTransparency = 1,
-                    Text = config.Title or "Slider",
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    TextSize = 14,
-                    Font = Enum.Font.Gotham,
-                    TextXAlignment = Enum.TextXAlignment.Left
-                })
-
-                local sliderBar = createInstance("Frame", {
-                    Parent = sliderFrame,
-                    Size = UDim2.new(1, -20, 0, 6),
-                    Position = UDim2.new(0, 10, 0, 30),
-                    BackgroundColor3 = Color3.fromRGB(70, 70, 80),
-                    BorderSizePixel = 0
-                })
-                createInstance("UICorner", { CornerRadius = UDim.new(0, 3), Parent = sliderBar })
-
-                local fillBar = createInstance("Frame", {
-                    Parent = sliderBar,
-                    Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
-                    BackgroundColor3 = Color3.fromRGB(100, 100, 255),
-                    BorderSizePixel = 0
-                })
-                createInstance("UICorner", { CornerRadius = UDim.new(0, 3), Parent = fillBar })
-
-                local sliderValue = createInstance("TextLabel", {
-                    Parent = sliderFrame,
-                    Size = UDim2.new(0, 50, 0, 20),
-                    Position = UDim2.new(1, -60, 0, 5),
-                    BackgroundTransparency = 1,
-                    Text = tostring(default),
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    TextSize = 14,
-                    Font = Enum.Font.Gotham
-                })
-
-                local dragging = false
-                sliderBar.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        dragging = true
-                    end
-                end)
-                sliderBar.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        dragging = false
-                    end
-                end)
-                UserInputService.InputChanged:Connect(function(input)
-                    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                        local mouseX = input.Position.X
-                        local barX = sliderBar.AbsolutePosition.X
-                        local barWidth = sliderBar.AbsoluteSize.X
-                        local relativeX = math.clamp((mouseX - barX) / barWidth, 0, 1)
-                        local value = min + (max - min) * relativeX
-                        value = math.floor(value + 0.5)
-                        createTween(fillBar, { Size = UDim2.new(relativeX, 0, 1, 0) }, 0.1)
-                        sliderValue.Text = tostring(value)
-                        if config.Callback then
-                            config.Callback(value)
-                        end
-                    end
-                end)
-                updateSectionHeight()
-
-                slider.Set = function(value)
-                    value = math.clamp(value, min, max)
-                    local relativeX = (value - min) / (max - min)
-                    createTween(fillBar, { Size = UDim2.new(relativeX, 0, 1, 0) }, 0.1)
-                    sliderValue.Text = tostring(value)
-                    if config.Callback then
-                        config.Callback(value)
-                    end
-                end
-                return slider
-            end
-
-            return section
-        end
-
-        tabs[#tabs + 1] = tab
-        if #tabs == 1 then
-            tabButton:SimulateClick()
-        end
-        return tab
-    end
-
-    -- Notification System
-    function window:CreateNotification(config)
-        local notification = createInstance("Frame", {
-            Parent = screenGui,
-            Size = UDim2.new(0, 250, 0, 80),
-            Position = UDim2.new(1, -260, 1, -90),
-            BackgroundColor3 = Color3.fromRGB(35, 35, 45),
-            BorderSizePixel = 0
-        })
-        createInstance("UICorner", { CornerRadius = UDim.new(0, 8), Parent = notification })
-
-        local title = createInstance("TextLabel", {
-            Parent = notification,
-            Size = UDim2.new(1, -10, 0, 20),
-            Position = UDim2.new(0, 5, 0, 5),
-            BackgroundTransparency = 1,
-            Text = config.Title or "Notification",
-            TextColor3 = Color3.fromRGB(255, 255, 255),
-            TextSize = 14,
-            Font = Enum.Font.GothamBold,
-            TextXAlignment = Enum.TextXAlignment.Left
-        })
-
-        local description = createInstance("TextLabel", {
-            Parent = notification,
-            Size = UDim2.new(1, -10, 0, 40),
-            Position = UDim2.new(0, 5, 0, 25),
-            BackgroundTransparency = 1,
-            Text = config.Description or "This is a notification.",
-            TextColor3 = Color3.fromRGB(200, 200, 200),
-            TextSize = 12,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextWrapped = true
-        })
-
-        createTween(notification, { BackgroundTransparency = 0, Position = UDim2.new(1, -260, 1, -90) }, 0.5).Completed:Connect(function()
-            wait(config.Duration or 3)
-            createTween(notification, { BackgroundTransparency = 1, Position = UDim2.new(1, -260, 1, -110) }, 0.5).Completed:Connect(function()
-                notification:Destroy()
-            end)
-        end)
-    end
-
-    return window
-end
-
-return NeptuneUI.round(value)
-                TweenService:Create(Fill, TweenInfo.new(Config.Animation.Duration, Config.Animation.EasingStyle, Config.Animation.EasingDirection), {
-                    Size = UDim2.new(relX, 0, 1, 0)
-                }):Play()
-                TweenService:Create(Knob, TweenInfo.new(Config.Animation.Duration, Config.Animation.EasingStyle, Config.Animation.EasingDirection), {
-                    Position = UDim2.new(relX, -10, 0, -5)
-                }):Play()
-                ValueLabel.Text = tostring(value)
-                if callback then callback(value) end
-            end
-        end)
-
-        return SliderFrame
-    end
-
-    -- Notification system
-    function Window:CreateNotification(text, duration)
-        local Notification = Instance.new("Frame")
-        Notification.Size = UDim2.new(0, 300, 0, 100)
-        Notification.Position = UDim2.new(1, -320, 1, -120)
-        Notification.BackgroundColor3 = Config.Theme.BackgroundColor
-        Notification.BackgroundTransparency = 0.2
-        Notification.Parent = ScreenGui
-
-        local UICorner = Instance.new("UICorner")
-        UICorner.CornerRadius = UDim.new(0, Config.Theme.BorderRadius)
-        UICorner.Parent = Notification
-
-        local TextLabel = Instance.new("TextLabel")
-        TextLabel.Size = UDim2.new(1, -20, 1, -20)
-        TextLabel.Position = UDim2.new(0, 10, 0, 10)
-        TextLabel.BackgroundTransparency = 1
-        TextLabel.Text = text or "Notification"
-        TextLabel.TextColor3 = Config.Theme.TextColor
-        TextLabel.Font = Config.Theme.Font
-        TextLabel.TextSize = 14
-        TextLabel.TextWrapped = true
-        TextLabel.Parent = Notification
-
-        -- Slide-in animation
-        Notification.Position = UDim2.new(1, 0, 1, -120)
-        TweenService:Create(Notification, TweenInfo.new(Config.Animation.Duration, Config.Animation.EasingStyle, Config.Animation.EasingDirection), {
-            Position = UDim2.new(1, -320, 1, -120)
-        }):Play()
-
-        -- Auto-dismiss
-        wait(duration or 3)
-        TweenService:Create(Notification, TweenInfo.new(Config.Animation.Duration, Config.Animation.EasingStyle, Config.Animation.EasingDirection), {
-            Position = UDim2.new(1, 0, 1, -120)
-        }):Play()
-        wait(Config.Animation.Duration)
-        Notification:Destroy()
-    end
-
-    return Window
-end
-
--- Theme customization
-function NeptuneUI:SetTheme(theme)
-    for key, value in pairs(theme) do
-        Config.Theme[key] = value
-    end
-end
-
-return NeptuneUIe.Transparency = 0.5
-    Stroke.Parent = Notification
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -10, 1, 0)
-    Label.Position = UDim2.new(0, 5, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = Text or "Notification"
-    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Label.TextSize = 16
-    Label.Font = Enum.Font.SourceSans
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = Notification
-
-    -- Slide-in animation
-    local tweenIn = TweenService:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1, -260, 1, -70)})
-    tweenIn:Play()
-    tweenIn.Completed:Wait()
-
-    -- Slide-out animation after duration
-    spawn(function()
-        wait(Duration or 3)
-        local tweenOut = TweenService:Create(Notification, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1, 260, 1, -70)})
-        tweenOut:Play()
-        tweenOut.Completed:Wait()
-        Notification:Destroy()
-    end)
-end
-
-return NeptuneUI
+return NotificationSystem
