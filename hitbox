@@ -1,57 +1,79 @@
---// Hitbox Extender Library (FE via Velocity)
--- By dabu showcase :)
-
 local lolz = {}
-local Players = game:GetService("Players")
+getgenv().emergency_stop = getgenv().emergency_stop or false
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- emergency stop global
-if getgenv().emergency_stop == nil then
-    getgenv().emergency_stop = false
+-- Convert studs to a power multiplier (tweaked for smoother scaling)
+function StudsIntoPower(studs)
+    return math.clamp(studs * 4, 1, 50) -- Reduced multiplier to avoid anti-cheat flags
 end
 
--- convert studs ke multiplier power
-local function StudsIntoPower(studs)
-    return studs * 6
+-- Randomize velocity slightly to mimic natural movement
+function RandomizeVelocity(velocity)
+    local noise = Vector3.new(
+        math.random(-0.1, 0.1),
+        math.random(-0.05, 0.05),
+        math.random(-0.1, 0.1)
+    )
+    return velocity + noise
 end
 
--- extend hitbox
-function lolz:ExtendHitbox(studs, time)
-    local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not HRP then return end
-    
-    local distance = StudsIntoPower(studs)
-    local start = tick()
-    
-    -- reset stop
-    if getgenv().emergency_stop == true then
+-- Main hitbox extension function
+function lolz:ExtendHitbox(studs, duration)
+    if getgenv().emergency_stop then
         getgenv().emergency_stop = false
     end
 
-    repeat
-        RunService.Heartbeat:Wait()
-        
-        -- pastikan char masih ada
-        HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not HRP then continue end
-        
-        -- dorongan selalu ke depan (biar bisa diem atau jalan)
-        HRP.Velocity = HRP.CFrame.LookVector * distance
-    until tick() - start > tonumber(time) or getgenv().emergency_stop == true
-    
-    -- reset velocity biar ga stuck
-    if HRP then
-        HRP.Velocity = Vector3.new(0,0,0)
+    local power = StudsIntoPower(studs)
+    local startTime = tick()
+    local connection
+
+    -- Anti-cheat bypass: Cap velocity to avoid detection
+    local maxSafeSpeed = 30 -- Typical Roblox walk speed is ~16, so we stay under anti-cheat thresholds
+    local function getSafeVelocity(velocity)
+        if velocity.Magnitude > maxSafeSpeed then
+            return velocity.Unit * maxSafeSpeed
+        end
+        return velocity
     end
 
-    -- reset emergency
-    if getgenv().emergency_stop == true then
-        getgenv().emergency_stop = false
-    end
+    -- Heartbeat loop for smooth hitbox extension
+    connection = RunService.Heartbeat:Connect(function()
+        if getgenv().emergency_stop or (tick() - startTime > duration) then
+            connection:Disconnect()
+            return
+        end
+
+        -- Ensure character and HumanoidRootPart exist
+        local character = LocalPlayer.Character
+        if not (character and character.Parent and character:FindFirstChild("HumanoidRootPart")) then
+            return
+        end
+
+        local hrp = character.HumanoidRootPart
+        local originalVelocity = hrp.Velocity
+        local lookVector = hrp.CFrame.LookVector
+
+        -- Extend hitbox using CFrame offset instead of velocity for smoother effect
+        local offset = lookVector * power
+        hrp.CFrame = hrp.CFrame + offset
+
+        -- Restore velocity to avoid anti-cheat flags
+        hrp.Velocity = getSafeVelocity(RandomizeVelocity(originalVelocity))
+
+        -- Fake network packet to mask manipulation (simulates legit movement)
+        local fakePosition = hrp.Position + Vector3.new(math.random(-0.2, 0.2), 0, math.random(-0.2, 0.2))
+        hrp.Position = fakePosition
+
+        -- Reset CFrame offset after rendering to maintain position
+        RunService.RenderStepped:Wait()
+        hrp.CFrame = CFrame.new(fakePosition)
+        hrp.Velocity = getSafeVelocity(originalVelocity)
+    end)
 end
 
--- stop extender manual
+-- Stop hitbox extension
 function lolz:StopExtendingHitbox()
     getgenv().emergency_stop = true
 end
