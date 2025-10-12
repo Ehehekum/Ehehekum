@@ -1,7 +1,8 @@
--- TopBarPlus Clone v1.0 (Simplified Recreation)
--- Clone of https://github.com/1ForeverHD/TopbarPlus
--- Features: Icon creation, themes, labels, captions, basic dropdowns, events, mobile/console support
--- Usage: local Icon = require(script); local icon = Icon.new("MyIcon")
+-- TopBarPlus Clone v1.1 (Fixed for Roblox)
+-- Simplified recreation of TopBarPlus v3
+-- Features: Icons, labels, captions, dropdowns, events, mobile/console support
+-- Usage: local Icon = require(script); local icon = Icon.new("IconName")
+-- Host at: https://raw.githubusercontent.com/Ehehekum/Ehehekum/refs/heads/main/Print
 
 local IconModule = {}
 local Icons = {} -- Dictionary of active icons by UID
@@ -10,56 +11,34 @@ local Icons = {} -- Dictionary of active icons by UID
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
-
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- CoreGui Type Detection (for mobile/console)
-local CorePackages = game:GetService("CorePackages")
-local GuiService = game:GetService("GuiService")
-local isTenFootInterface = GuiService:IsTenFootInterface()
-
--- Create main ScreenGui (resizes with topbar)
+-- Create ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "TopBarPlusClone"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = PlayerGui
+screenGui.Enabled = true
 
--- Main container for icons (anchored to top-right, flows left)
+-- Main container (top-right, flows left)
 local iconContainer = Instance.new("Frame")
 iconContainer.Name = "IconContainer"
-iconContainer.Size = UDim2.new(0, 0, 0, 36) -- Standard topbar height
-iconContainer.Position = UDim2.new(1, -10, 0, 0) -- Top-right, offset
+iconContainer.Size = UDim2.new(1, 0, 0, 36)
+iconContainer.Position = UDim2.new(1, 0, 0, 0)
 iconContainer.AnchorPoint = Vector2.new(1, 0)
 iconContainer.BackgroundTransparency = 1
 iconContainer.Parent = screenGui
-
--- Overflow handler (basic: stack vertically if too wide)
-local overflowContainer = Instance.new("Frame")
-overflowContainer.Name = "OverflowContainer"
-overflowContainer.Size = UDim2.new(0, 200, 0, 0)
-overflowContainer.Position = UDim2.new(1, -210, 0, 40)
-overflowContainer.AnchorPoint = Vector2.new(1, 0)
-overflowContainer.BackgroundTransparency = 1
-overflowContainer.Visible = false
-overflowContainer.Parent = screenGui
 
 -- Theme defaults
 local defaultTheme = {
     Icon = {
         BackgroundColor3 = Color3.fromRGB(50, 50, 50),
         BackgroundTransparency = 0.3,
-        BorderColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
         IconColor3 = Color3.fromRGB(255, 255, 255),
-        IconTransparency = 0,
         LabelColor3 = Color3.fromRGB(255, 255, 255),
-        LabelTransparency = 1,
-        CaptionColor3 = Color3.fromRGB(200, 200, 200),
-        CaptionTransparency = 1
+        CaptionColor3 = Color3.fromRGB(200, 200, 200)
     },
     Selected = {
         BackgroundColor3 = Color3.fromRGB(70, 130, 180),
@@ -74,16 +53,12 @@ Icon.__index = Icon
 function Icon.new(name)
     local self = setmetatable({}, Icon)
     
-    self.UID = tostring(math.random(1e9)) -- Unique ID
+    self.UID = tostring(math.random(1e9))
     self.Name = name or "Unnamed"
-    self.IconLabel = nil
-    self.Label = nil
-    self.Caption = nil
-    self.Dropdown = nil
-    self.Theme = table.clone(defaultTheme)
     self.Selected = false
     self.Enabled = true
     self.Visible = true
+    self.Theme = table.clone(defaultTheme)
     self.Padding = 4
     
     -- Events
@@ -91,13 +66,10 @@ function Icon.new(name)
     self.Deselected = Instance.new("BindableEvent")
     self.Clicked = Instance.new("BindableEvent")
     
-    -- Create GUI
+    -- Render GUI
     self:render()
     
-    -- Store
     Icons[self.UID] = self
-    
-    -- Auto-layout on creation
     self:updatePosition()
     
     return self
@@ -105,48 +77,46 @@ end
 
 function Icon:render()
     local iconFrame = Instance.new("Frame")
-    iconFrame.Name = "IconFrame"
+    iconFrame.Name = "IconFrame_" .. self.UID
     iconFrame.Size = UDim2.new(0, 36, 0, 36)
     iconFrame.BackgroundTransparency = 1
     iconFrame.Parent = iconContainer
     
-    -- Icon Button (ImageLabel for icon)
     local iconBtn = Instance.new("TextButton")
     iconBtn.Name = "IconButton"
     iconBtn.Size = UDim2.new(1, 0, 1, 0)
-    iconBtn.BackgroundTransparency = 1
-    iconBtn.Text = self.Name:sub(1,1):upper() -- Default to first letter as icon
+    iconBtn.BackgroundColor3 = self.Theme.Icon.BackgroundColor3
+    iconBtn.BackgroundTransparency = self.Theme.Icon.BackgroundTransparency
+    iconBtn.Text = self.Name:sub(1,1):upper()
     iconBtn.Font = Enum.Font.SourceSansBold
     iconBtn.TextSize = 18
-    iconBtn.TextColor3 = self.Theme.Icon.Color3
+    iconBtn.TextColor3 = self.Theme.Icon.IconColor3
     iconBtn.Parent = iconFrame
     
-    -- MouseEnter/Leave for hover
+    -- Hover effects
     iconBtn.MouseEnter:Connect(function()
         if self.Enabled and not self.Selected then
-            TweenService:Create(iconBtn, TweenInfo.new(0.2), {BackgroundTransparency = self.Theme.Icon.BackgroundTransparency}):Play()
+            TweenService:Create(iconBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0.2}):Play()
         end
     end)
     
     iconBtn.MouseLeave:Connect(function()
         if self.Enabled and not self.Selected then
-            TweenService:Create(iconBtn, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(iconBtn, TweenInfo.new(0.2), {BackgroundTransparency = self.Theme.Icon.BackgroundTransparency}):Play()
         end
     end)
     
-    -- Click event
+    -- Click handling
     iconBtn.MouseButton1Click:Connect(function()
         self:toggle()
     end)
     
-    -- Support gamepad/mobile input
-    if UserInputService.TouchEnabled or isTenFootInterface then
-        iconBtn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch or input.KeyCode == Enum.KeyCode.ButtonA then
-                self:toggle()
-            end
-        end)
-    end
+    -- Mobile/console support
+    iconBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.KeyCode == Enum.KeyCode.ButtonA then
+            self:toggle()
+        end
+    end)
     
     self.Frame = iconFrame
     self.Button = iconBtn
@@ -156,7 +126,7 @@ function Icon:setLabel(text)
     if not self.Label then
         self.Label = Instance.new("TextLabel")
         self.Label.Name = "Label"
-        self.Label.Size = UDim2.new(0, 0, 0, 14)
+        self.Label.Size = UDim2.new(0, 100, 0, 14)
         self.Label.Position = UDim2.new(0, 0, 1, 2)
         self.Label.BackgroundTransparency = 1
         self.Label.Font = Enum.Font.SourceSans
@@ -173,7 +143,7 @@ function Icon:setCaption(text)
     if not self.Caption then
         self.Caption = Instance.new("TextLabel")
         self.Caption.Name = "Caption"
-        self.Caption.Size = UDim2.new(0, 0, 0, 12)
+        self.Caption.Size = UDim2.new(0, 100, 0, 12)
         self.Caption.Position = UDim2.new(0, 0, 1, 18)
         self.Caption.BackgroundTransparency = 1
         self.Caption.Font = Enum.Font.SourceSansItalic
@@ -188,17 +158,14 @@ end
 
 function Icon:setIcon(imageId)
     self.Button.Text = ""
-    local imageLabel = self.Button:FindFirstChild("ImageLabel")
-    if not imageLabel then
-        imageLabel = Instance.new("ImageLabel")
-        imageLabel.Name = "ImageLabel"
-        imageLabel.Size = UDim2.new(0.8, 0, 0.8, 0)
-        imageLabel.Position = UDim2.new(0.1, 0, 0.1, 0)
-        imageLabel.BackgroundTransparency = 1
-        imageLabel.ImageColor3 = self.Theme.Icon.IconColor3
-        imageLabel.Parent = self.Button
-    end
-    imageLabel.Image = "rbxassetid://" .. (imageId or 0)
+    local imageLabel = self.Button:FindFirstChild("ImageLabel") or Instance.new("ImageLabel")
+    imageLabel.Name = "ImageLabel"
+    imageLabel.Size = UDim2.new(0.8, 0, 0.8, 0)
+    imageLabel.Position = UDim2.new(0.1, 0, 0.1, 0)
+    imageLabel.BackgroundTransparency = 1
+    imageLabel.ImageColor3 = self.Theme.Icon.IconColor3
+    imageLabel.Image = imageId and "rbxassetid://" .. imageId or ""
+    imageLabel.Parent = self.Button
 end
 
 function Icon:addDropdown(options)
@@ -206,26 +173,29 @@ function Icon:addDropdown(options)
     
     local dropdownFrame = Instance.new("Frame")
     dropdownFrame.Name = "Dropdown"
-    dropdownFrame.Size = UDim2.new(0, 100, 0, #options * 20)
-    dropdownFrame.Position = UDim2.new(0, 40, 0, 0)
+    dropdownFrame.Size = UDim2.new(0, 120, 0, #options * 24)
+    dropdownFrame.Position = UDim2.new(0, 0, 1, 36)
     dropdownFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     dropdownFrame.BackgroundTransparency = 0.2
-    dropdownFrame.BorderSizePixel = 0
     dropdownFrame.Visible = false
     dropdownFrame.Parent = self.Frame
     
     for i, opt in ipairs(options) do
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 0, 20)
-        btn.Position = UDim2.new(0, 0, 0, (i-1)*20)
-        btn.BackgroundTransparency = 1
+        btn.Size = UDim2.new(1, 0, 0, 24)
+        btn.Position = UDim2.new(0, 0, 0, (i-1)*24)
+        btn.BackgroundTransparency = 0.3
         btn.Text = opt
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.SourceSans
+        btn.TextSize = 14
         btn.Parent = dropdownFrame
         
         btn.MouseButton1Click:Connect(function()
             self.Clicked:Fire(opt)
             self.Dropdown.Visible = false
+            self.Selected = false
+            self.Button.BackgroundTransparency = self.Theme.Icon.BackgroundTransparency
         end)
     end
     
@@ -235,40 +205,28 @@ end
 function Icon:toggle()
     if not self.Enabled then return end
     
-    local wasSelected = self.Selected
     self.Selected = not self.Selected
-    
     if self.Selected then
         self.Button.BackgroundColor3 = self.Theme.Selected.BackgroundColor3
         self.Button.BackgroundTransparency = self.Theme.Selected.BackgroundTransparency
         if self.Dropdown then self.Dropdown.Visible = true end
-        self.Selected:Fire("User")
+        self.Selected:Fire()
     else
         self.Button.BackgroundColor3 = self.Theme.Icon.BackgroundColor3
         self.Button.BackgroundTransparency = self.Theme.Icon.BackgroundTransparency
         if self.Dropdown then self.Dropdown.Visible = false end
-        self.Deselected:Fire("User")
+        self.Deselected:Fire()
     end
-    
-    -- Auto-deselect others (basic single-select)
-    for _, icon in pairs(Icons) do
-        if icon ~= self and icon.Selected then
-            icon.Selected = false
-            icon.Button.BackgroundTransparency = 1
-            icon.Deselected:Fire("AutoDeselect")
-        end
-    end
-    
-    if not wasSelected then
-        self.Clicked:Fire()
-    end
+    self.Clicked:Fire()
 end
 
 function Icon:setTheme(theme)
     self.Theme = theme
-    -- Apply theme (simplified)
     if self.Button then
-        self.Button.TextColor3 = theme.Icon.IconColor3
+        self.Button.BackgroundColor3 = theme.Icon.BackgroundColor3
+        self.Button.BackgroundTransparency = theme.Icon.BackgroundTransparency
+        local imageLabel = self.Button:FindFirstChild("ImageLabel")
+        if imageLabel then imageLabel.ImageColor3 = theme.Icon.IconColor3 end
     end
     if self.Label then self.Label.TextColor3 = theme.Icon.LabelColor3 end
     if self.Caption then self.Caption.TextColor3 = theme.Icon.CaptionColor3 end
@@ -282,6 +240,17 @@ end
 function Icon:setVisible(bool)
     self.Visible = bool
     self.Frame.Visible = bool and self.Enabled
+    self:updatePosition()
+end
+
+function Icon:updatePosition()
+    local xPos = 0
+    for _, icon in pairs(Icons) do
+        if icon.Visible and icon.Enabled then
+            icon.Frame.Position = UDim2.new(1, -xPos - 40, 0, 0)
+            xPos = xPos + 40 + icon.Padding
+        end
+    end
 end
 
 function Icon:destroy()
@@ -292,17 +261,30 @@ function Icon:destroy()
     self.Clicked:Destroy()
 end
 
-function Icon:updatePosition()
-    -- Basic right-to-left flow
-    local totalWidth = 0
-    for _, icon in pairs(Icons) do
-        if icon.Visible and icon.Enabled then
-            totalWidth = totalWidth + 40 + icon.Padding
-        end
+-- Module API
+function IconModule.new(name)
+    local icon = Icon.new(name)
+    for _, i in pairs(Icons) do
+        i:updatePosition()
     end
-    
-    if totalWidth > iconContainer.AbsoluteSize.X then
-        -- Overflow logic (show overflow button)
+    return icon
+end
+
+function IconModule.getIcons()
+    return Icons
+end
+
+function IconModule.setTopbarEnabled(bool)
+    screenGui.Enabled = bool
+end
+
+-- Auto-create a test icon
+local testIcon = IconModule.new("Test")
+testIcon:setLabel("Test Icon")
+testIcon:setCaption("Click to test!")
+testIcon:setIcon(4483345998)
+
+return IconModuleow button)
         overflowContainer.Visible = true
         -- Move excess to overflow (simplified: just hide for now)
     end
