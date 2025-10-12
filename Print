@@ -1,244 +1,292 @@
--- Custom Roblox Notification System (Enhanced)
-local TweenService = game:GetService("TweenService")
+-- TopbarPlusClone (ModuleScript)
+-- Simple topbar icon manager for client
+-- Usage: local TP = require(pathTo.TopbarPlusClone); local icon = TP.newIcon("id", options)
+
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
 
--- Default configuration if not set via getgenv
-getgenv().NotificationConfig = getgenv().NotificationConfig or {
-    Type = "Info", -- "Info" or "Option"
-    Message = "Welcome to the Ultimate Notification System!",
-    Title = "Notification",
-    Duration = 5, -- Duration in seconds (for Info type)
-    Icon = "rbxassetid://1234567890", -- Replace with valid decal/image ID
-    SoundId = "rbxassetid://9120386446", -- Roblox notification sound
-    PrimaryColor = Color3.fromRGB(0, 120, 255), -- Main color for gradient
-    SecondaryColor = Color3.fromRGB(0, 80, 200) -- Secondary color for gradient
-}
+local Topbar = {}
+Topbar.__index = Topbar
 
--- Validate and fix icon (decal ID)
-local function validateIcon(iconId)
-    if iconId and iconId ~= "" then
-        -- Ensure the asset is a valid image/decal ID
-        local success, result = pcall(function()
-            return game:GetService("MarketplaceService"):GetProductInfo(tonumber(iconId:match("%d+")))
-        end)
-        if success and (result.AssetTypeId == 1 or result.AssetTypeId == 13) then -- 1 = Image, 13 = Decal
-            return iconId
+-- helper: Event-like object
+local function makeSignal()
+    local conn = {}
+    conn._cbs = {}
+    function conn:Connect(fn) table.insert(self._cbs, fn); return {Disconnect = function() end} end
+    function conn:Fire(...) for _,cb in ipairs(self._cbs) do
+            task.spawn(cb, ...)
         end
     end
-    return "rbxassetid://7072706764" -- Fallback to Roblox default icon
+    function conn:Clear() self._cbs = {} end
+    return conn
 end
 
--- Create notification
-local function createNotification()
-    -- Create ScreenGui
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "EnhancedNotification"
-    ScreenGui.Parent = PlayerGui
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.IgnoreGuiInset = true
+-- Create UI once per player
+local function createGuiForPlayer(player)
+    -- Wait for PlayerGui
+    local pg = player:WaitForChild("PlayerGui")
+    local sg = pg:FindFirstChild("TopbarPlusCloneGui")
+    if sg then return sg end
 
-    -- Main frame
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 320, 0, 120)
-    Frame.Position = UDim2.new(1, -10, 0, -150) -- Start off-screen (top-right)
-    Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    Frame.BorderSizePixel = 0
-    Frame.ClipsDescendants = true
-    Frame.Parent = ScreenGui
+    sg = Instance.new("ScreenGui")
+    sg.Name = "TopbarPlusCloneGui"
+    sg.ResetOnSpawn = false
+    sg.Parent = pg
 
-    -- Rounded corners
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 12)
-    UICorner.Parent = Frame
+    -- Container frame anchored top-right (adjust as needed)
+    local container = Instance.new("Frame")
+    container.Name = "Container"
+    container.Size = UDim2.new(0, 220, 0, 36)
+    container.Position = UDim2.new(1, -236, 0, 8) -- top-right offset
+    container.AnchorPoint = Vector2.new(0, 0)
+    container.BackgroundTransparency = 1
+    container.Parent = sg
 
-    -- Gradient
-    local UIGradient = Instance.new("UIGradient")
-    UIGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, getgenv().NotificationConfig.PrimaryColor),
-        ColorSequenceKeypoint.new(1, getgenv().NotificationConfig.SecondaryColor)
-    }
-    UIGradient.Rotation = 45
-    UIGradient.Parent = Frame
+    local uiList = Instance.new("UIListLayout")
+    uiList.Name = "IconLayout"
+    uiList.FillDirection = Enum.FillDirection.Horizontal
+    uiList.Padding = UDim.new(0, 6)
+    uiList.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    uiList.VerticalAlignment = Enum.VerticalAlignment.Center
+    uiList.Parent = container
 
-    -- Glowing border
-    local UIStroke = Instance.new("UIStroke")
-    UIStroke.Thickness = 2
-    UIStroke.Color = getgenv().NotificationConfig.PrimaryColor
-    UIStroke.Transparency = 0.3
-    UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    UIStroke.Parent = Frame
+    return sg
+end
 
-    -- Shadow
-    local Shadow = Instance.new("ImageLabel")
-    Shadow.Size = UDim2.new(1, 15, 1, 15)
-    Shadow.Position = UDim2.new(0, -7, 0, -7)
-    Shadow.BackgroundTransparency = 1
-    Shadow.Image = "rbxassetid://1316045217" -- Roblox shadow asset
-    Shadow.ImageTransparency = 0.6
-    Shadow.ZIndex = -1
-    Shadow.Parent = Frame
+-- Icon object metatable
+local Icon = {}
+Icon.__index = Icon
 
-    -- Title bar
-    local TitleBar = Instance.new("Frame")
-    TitleBar.Size = UDim2.new(1, 0, 0, 30)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-    TitleBar.BorderSizePixel = 0
-    TitleBar.Parent = Frame
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 12)
-    TitleCorner.Parent = TitleBar
-
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, -10, 1, 0)
-    Title.Position = UDim2.new(0, 10, 0, 0)
-    Title.BackgroundTransparency = 1
-    Title.Text = getgenv().NotificationConfig.Title
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.TextSize = 16
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.Font = Enum.Font.GothamBold
-    Title.Parent = TitleBar
-
-    -- Icon
-    local Icon = Instance.new("ImageLabel")
-    Icon.Size = UDim2.new(0, 40, 0, 40)
-    Icon.Position = UDim2.new(0, 15, 0, 40)
-    Icon.BackgroundTransparency = 1
-    Icon.Image = validateIcon(getgenv().NotificationConfig.Icon)
-    Icon.Parent = Frame
-
-    -- Message
-    local Message = Instance.new("TextLabel")
-    Message.Size = UDim2.new(0, 240, 0, 50)
-    Message.Position = UDim2.new(0, 65, 0, 35)
-    Message.BackgroundTransparency = 1
-    Message.Text = getgenv().NotificationConfig.Message
-    Message.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Message.TextSize = 14
-    Message.TextWrapped = true
-    Message.TextXAlignment = Enum.TextXAlignment.Left
-    Message.Font = Enum.Font.Gotham
-    Message.Parent = Frame
-
-    -- Sound
-    local Sound = Instance.new("Sound")
-    Sound.SoundId = getgenv().NotificationConfig.SoundId
-    Sound.Volume = 0.7
-    Sound.Parent = Frame
-    Sound:Play()
-
-    -- Animations
-    local tweenIn = TweenService:Create(Frame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -330, 0, 20),
-        Size = UDim2.new(0, 320, 0, 120) -- Slight scale-up
-    })
-    tweenIn:Play()
-
-    -- Progress bar for Info type
-    local function createProgressBar()
-        local ProgressBar = Instance.new("Frame")
-        ProgressBar.Size = UDim2.new(1, -20, 0, 5)
-        ProgressBar.Position = UDim2.new(0, 10, 1, -15)
-        ProgressBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        ProgressBar.Parent = Frame
-        local ProgressCorner = Instance.new("UICorner")
-        ProgressCorner.CornerRadius = UDim.new(0, 3)
-        ProgressCorner.Parent = ProgressBar
-
-        local Fill = Instance.new("Frame")
-        Fill.Size = UDim2.new(0, 0, 1, 0)
-        Fill.BackgroundColor3 = getgenv().NotificationConfig.PrimaryColor
-        Fill.Parent = ProgressBar
-        local FillCorner = Instance.new("UICorner")
-        FillCorner.CornerRadius = UDim.new(0, 3)
-        FillCorner.Parent = Fill
-
-        local tweenProgress = TweenService:Create(Fill, TweenInfo.new(getgenv().NotificationConfig.Duration, Enum.EasingStyle.Linear), {
-            Size = UDim2.new(1, 0, 1, 0)
-        })
-        tweenProgress:Play()
-        return tweenProgress
+function Icon:Destroy()
+    if self._root and self._root.Parent then
+        self._root:Destroy()
     end
-
-    -- Close animation
-    local function closeNotification()
-        local tweenOut = TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Position = UDim2.new(1, -10, 0, 20),
-            Size = UDim2.new(0, 300, 0, 110) -- Slight scale-down
-        })
-        tweenOut:Play()
-        tweenOut.Completed:Connect(function()
-            ScreenGui:Destroy()
-        end)
+    if self._dropdownRoot and self._dropdownRoot.Parent then
+        self._dropdownRoot:Destroy()
     end
+    self._clicked:Clear()
+    self._opened:Clear()
+    self._closed:Clear()
+end
 
-    -- Handle notification type
-    if getgenv().NotificationConfig.Type == "Option" then
-        -- Confirm button
-        local ConfirmButton = Instance.new("TextButton")
-        ConfirmButton.Size = UDim2.new(0, 100, 0, 30)
-        ConfirmButton.Position = UDim2.new(0, 65, 0, 80)
-        ConfirmButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        ConfirmButton.Text = "Confirm"
-        ConfirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ConfirmButton.TextSize = 14
-        ConfirmButton.Font = Enum.Font.GothamBold
-        ConfirmButton.Parent = Frame
-        local ConfirmCorner = Instance.new("UICorner")
-        ConfirmCorner.CornerRadius = UDim.new(0, 8)
-        ConfirmCorner.Parent = ConfirmButton
+function Icon:SetEnabled(enabled)
+    self._enabled = enabled
+    if self._btn then
+        self._btn.AutoButtonColor = enabled
+        self._btn.Visible = enabled
+        self._btn.ImageTransparency = enabled and 0 or 0.6
+    end
+end
 
-        -- Decline button
-        local DeclineButton = Instance.new("TextButton")
-        DeclineButton.Size = UDim2.new(0, 100, 0, 30)
-        DeclineButton.Position = UDim2.new(0, 175, 0, 80)
-        DeclineButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        DeclineButton.Text = "Decline"
-        DeclineButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        DeclineButton.TextSize = 14
-        DeclineButton.Font = Enum.Font.GothamBold
-        DeclineButton.Parent = Frame
-        local DeclineCorner = Instance.new("UICorner")
-        DeclineCorner.CornerRadius = UDim.new(0, 8)
-        DeclineCorner.Parent = DeclineButton
+function Icon:OpenDropdown()
+    if self._dropdownRoot then
+        self:_showDropdown(true)
+    end
+end
 
-        -- Button hover effects
-        local function addHoverEffect(button)
-            button.MouseEnter:Connect(function()
-                TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-                    Size = UDim2.new(0, 105, 0, 32)
-                }):Play()
-            end)
-            button.MouseLeave:Connect(function()
-                TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
-                    Size = UDim2.new(0, 100, 0, 30)
-                }):Play()
-            end)
-        end
-        addHoverEffect(ConfirmButton)
-        addHoverEffect(DeclineButton)
+function Icon:CloseDropdown()
+    if self._dropdownRoot then
+        self:_showDropdown(false)
+    end
+end
 
-        -- Button functionality
-        ConfirmButton.MouseButton1Click:Connect(function()
-            print("Confirm clicked!")
-            closeNotification()
-        end)
-        DeclineButton.MouseButton1Click:Connect(function()
-            print("Decline clicked!")
-            closeNotification()
-        end)
+function Icon:ToggleDropdown()
+    if self._dropdownRoot then
+        self:_showDropdown(not self._dropdownOpen)
+    end
+end
+
+function Icon:_showDropdown(show)
+    if not self._dropdownRoot then return end
+    self._dropdownRoot.Visible = show
+    self._dropdownOpen = show
+    if show then
+        self._opened:Fire()
     else
-        -- Info type: Auto-close with progress bar
-        local progressTween = createProgressBar()
-        wait(getgenv().NotificationConfig.Duration)
-        progressTween:Cancel()
-        closeNotification()
+        self._closed:Fire()
     end
 end
 
--- Execute the notification
-createNotification()
+function Icon:AddDropdown(opts)
+    -- opts: {Title = "Title", Items = { {Text="x", Callback = fn}, ... } }
+    if self._dropdownRoot then self._dropdownRoot:Destroy() end
+    local root = Instance.new("Frame")
+    root.Name = "DropdownRoot"
+    root.Size = UDim2.new(0, 180, 0, 28)
+    root.AnchorPoint = Vector2.new(1, 0)
+    root.BackgroundTransparency = 0.1
+    root.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    root.BorderSizePixel = 0
+    root.Visible = false
+
+    -- Position right under icon
+    root.Position = UDim2.new(0, 0, 0, 40)
+    root.Parent = self._root
+
+    local layout = Instance.new("UIListLayout")
+    layout.FillDirection = Enum.FillDirection.Vertical
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 4)
+    layout.Parent = root
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -8, 0, 24)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Text = opts.Title or ""
+    titleLabel.Font = Enum.Font.SourceSansBold
+    titleLabel.TextSize = 14
+    titleLabel.TextColor3 = Color3.new(1,1,1)
+    titleLabel.LayoutOrder = 0
+    titleLabel.Parent = root
+
+    local items = opts.Items or {}
+    local order = 1
+    for _,it in ipairs(items) do
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(1, -8, 0, 28)
+        b.BackgroundTransparency = 0.2
+        b.Text = it.Text or "Item"
+        b.Font = Enum.Font.SourceSans
+        b.TextSize = 14
+        b.TextColor3 = Color3.new(1,1,1)
+        b.LayoutOrder = order
+        b.Parent = root
+        order = order + 1
+
+        b.MouseButton1Click:Connect(function()
+            -- close dropdown and call callback
+            self:_showDropdown(false)
+            if type(it.Callback) == "function" then
+                task.spawn(it.Callback)
+            end
+        end)
+    end
+
+    -- auto size root frame height
+    RunService.Heartbeat:Wait()
+    local total = 0
+    for _,child in ipairs(root:GetChildren()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            total = total + child.Size.Y.Offset + layout.Padding.Offset
+        end
+    end
+    root.Size = UDim2.new(0, 180, 0, math.max(28, total + 8))
+
+    self._dropdownRoot = root
+    self._dropdownOpen = false
+    return root
+end
+
+function Icon:Update(opts)
+    if opts.Title then
+        self._title = opts.Title
+    end
+    if opts.Image then
+        self._img = opts.Image
+        if self._btn then self._btn.Image = opts.Image end
+    end
+    if opts.Enabled ~= nil then
+        self:SetEnabled(opts.Enabled)
+    end
+end
+
+-- public API: newIcon(name, options)
+-- options: {Title="", Image="rbxassetid://", Enabled=true}
+function Topbar.newIcon(name, options)
+    options = options or {}
+    local player = Players.LocalPlayer
+    if not player then
+        warn("TopbarPlusClone: LocalPlayer not ready")
+        return nil
+    end
+
+    local gui = createGuiForPlayer(player)
+    local container = gui:WaitForChild("Container")
+
+    -- root frame to anchor dropdown
+    local root = Instance.new("Frame")
+    root.Name = ("IconRoot_%s"):format(name)
+    root.BackgroundTransparency = 1
+    root.Size = UDim2.new(0, 34, 0, 34)
+    root.Parent = container
+
+    local btn = Instance.new("ImageButton")
+    btn.Name = "IconButton"
+    btn.Size = UDim2.new(0, 34, 0, 34)
+    btn.Position = UDim2.new(1, -34, 0, 0)
+    btn.AnchorPoint = Vector2.new(1, 0)
+    btn.BackgroundTransparency = 0.15
+    btn.Image = options.Image or ""
+    btn.ScaleType = Enum.ScaleType.Fit
+    btn.Parent = root
+
+    -- simple hover effect (no external libs)
+    btn.MouseEnter:Connect(function() btn.BackgroundTransparency = 0.05 end)
+    btn.MouseLeave:Connect(function() btn.BackgroundTransparency = 0.15 end)
+
+    local iconObj = setmetatable({
+        Name = name,
+        _root = root,
+        _btn = btn,
+        _title = options.Title or name,
+        _img = options.Image or "",
+        _enabled = options.Enabled ~= false,
+        _clicked = makeSignal(),
+        _opened = makeSignal(),
+        _closed = makeSignal(),
+    }, Icon)
+
+    -- click behavior
+    btn.MouseButton1Click:Connect(function()
+        if not iconObj._enabled then return end
+        iconObj._clicked:Fire(iconObj)
+    end)
+
+    -- close dropdown if click elsewhere
+    local function onGlobalClick()
+        if iconObj._dropdownRoot and iconObj._dropdownOpen then
+            iconObj:_showDropdown(false)
+        end
+    end
+    -- connect a global invisible button
+    local globalBtn = Instance.new("TextButton")
+    globalBtn.Name = "GlobalClose"
+    globalBtn.BackgroundTransparency = 1
+    globalBtn.Size = UDim2.new(1,0,1,0)
+    globalBtn.Position = UDim2.new(0,0,0,0)
+    globalBtn.Parent = gui
+    globalBtn.ZIndex = 0
+    -- ensure we don't block input to other UIs: capture only when dropdown is open
+    globalBtn.MouseButton1Click:Connect(function()
+        onGlobalClick()
+    end)
+    -- hide the global button (we'll toggle visibility)
+    globalBtn.Visible = false
+
+    -- when opening dropdown, toggle globalBtn visible to detect outside clicks
+    iconObj._opened:Connect(function()
+        globalBtn.Visible = true
+    end)
+    iconObj._closed:Connect(function()
+        globalBtn.Visible = false
+    end)
+
+    -- attach helper methods for events
+    function iconObj.clicked() return iconObj._clicked end
+    function iconObj.opened() return iconObj._opened end
+    function iconObj.closed() return iconObj._closed end
+
+    -- expose UI root for advanced customizations
+    iconObj.UI = root
+
+    -- default enabled state
+    iconObj:SetEnabled(iconObj._enabled)
+
+    -- briefly yield to allow layout to apply
+    RunService.Heartbeat:Wait()
+
+    return iconObj
+end
+
+return Topbar
