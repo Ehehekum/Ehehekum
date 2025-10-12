@@ -1,325 +1,200 @@
--- TopBarPlus Clone v1.1 (Fixed for Roblox)
--- Simplified recreation of TopBarPlus v3
--- Features: Icons, labels, captions, dropdowns, events, mobile/console support
--- Usage: local Icon = require(script); local icon = Icon.new("IconName")
--- Host at: https://raw.githubusercontent.com/Ehehekum/Ehehekum/refs/heads/main/Print
+-- TopBarLite.lua
+-- Lightweight TopBarPlus-like module (Dropdown + Button)
+-- Made for loadstring(game:HttpGet(...))() usage
 
-local IconModule = {}
-local Icons = {} -- Dictionary of active icons by UID
-
--- Services
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
+local CoreGui = game:GetService("CoreGui")
 
--- Create ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "TopBarPlusClone"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = PlayerGui
-screenGui.Enabled = true
+-- Cleanup if already loaded
+if CoreGui:FindFirstChild("TopBarLiteGui") then
+	CoreGui.TopBarLiteGui:Destroy()
+end
 
--- Main container (top-right, flows left)
-local iconContainer = Instance.new("Frame")
-iconContainer.Name = "IconContainer"
-iconContainer.Size = UDim2.new(1, 0, 0, 36)
-iconContainer.Position = UDim2.new(1, 0, 0, 0)
-iconContainer.AnchorPoint = Vector2.new(1, 0)
-iconContainer.BackgroundTransparency = 1
-iconContainer.Parent = screenGui
+-- Create main ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "TopBarLiteGui"
+gui.IgnoreGuiInset = true
+gui.DisplayOrder = 9999
+gui.Parent = CoreGui
 
--- Theme defaults
+-- Registry for icons
+local icons = {}
+
+-- Base module
+local IconModule = {}
+
+-- Utility: create signal (simple RBXScriptSignal clone)
+local function CreateSignal()
+	local bind = Instance.new("BindableEvent")
+	return {
+		Event = bind.Event,
+		Fire = function(_, ...)
+			bind:Fire(...)
+		end,
+	}
+end
+
+-- Utility: theme defaults
 local defaultTheme = {
-    Icon = {
-        BackgroundColor3 = Color3.fromRGB(50, 50, 50),
-        BackgroundTransparency = 0.3,
-        IconColor3 = Color3.fromRGB(255, 255, 255),
-        LabelColor3 = Color3.fromRGB(255, 255, 255),
-        CaptionColor3 = Color3.fromRGB(200, 200, 200)
-    },
-    Selected = {
-        BackgroundColor3 = Color3.fromRGB(70, 130, 180),
-        BackgroundTransparency = 0.1
-    }
+	Icon = {
+		BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+		BackgroundTransparency = 0.2,
+		IconColor3 = Color3.fromRGB(255, 255, 255),
+		LabelColor3 = Color3.fromRGB(220, 220, 220),
+		CaptionColor3 = Color3.fromRGB(180, 180, 180)
+	},
+	Selected = {
+		BackgroundColor3 = Color3.fromRGB(80, 80, 200),
+		BackgroundTransparency = 0.2
+	}
 }
 
--- Icon Class
-local Icon = {}
-Icon.__index = Icon
-
-function Icon.new(name)
-    local self = setmetatable({}, Icon)
-    
-    self.UID = tostring(math.random(1e9))
-    self.Name = name or "Unnamed"
-    self.Selected = false
-    self.Enabled = true
-    self.Visible = true
-    self.Theme = table.clone(defaultTheme)
-    self.Padding = 4
-    
-    -- Events
-    self.Selected = Instance.new("BindableEvent")
-    self.Deselected = Instance.new("BindableEvent")
-    self.Clicked = Instance.new("BindableEvent")
-    
-    -- Render GUI
-    self:render()
-    
-    Icons[self.UID] = self
-    self:updatePosition()
-    
-    return self
+-- Helper: Apply theme
+local function applyTheme(icon, theme)
+	local iconFrame = icon.Frame
+	local t = theme.Icon
+	iconFrame.BackgroundColor3 = t.BackgroundColor3
+	iconFrame.BackgroundTransparency = t.BackgroundTransparency
+	icon.IconLabel.TextColor3 = t.LabelColor3
+	icon.Caption.TextColor3 = t.CaptionColor3
 end
 
-function Icon:render()
-    local iconFrame = Instance.new("Frame")
-    iconFrame.Name = "IconFrame_" .. self.UID
-    iconFrame.Size = UDim2.new(0, 36, 0, 36)
-    iconFrame.BackgroundTransparency = 1
-    iconFrame.Parent = iconContainer
-    
-    local iconBtn = Instance.new("TextButton")
-    iconBtn.Name = "IconButton"
-    iconBtn.Size = UDim2.new(1, 0, 1, 0)
-    iconBtn.BackgroundColor3 = self.Theme.Icon.BackgroundColor3
-    iconBtn.BackgroundTransparency = self.Theme.Icon.BackgroundTransparency
-    iconBtn.Text = self.Name:sub(1,1):upper()
-    iconBtn.Font = Enum.Font.SourceSansBold
-    iconBtn.TextSize = 18
-    iconBtn.TextColor3 = self.Theme.Icon.IconColor3
-    iconBtn.Parent = iconFrame
-    
-    -- Hover effects
-    iconBtn.MouseEnter:Connect(function()
-        if self.Enabled and not self.Selected then
-            TweenService:Create(iconBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0.2}):Play()
-        end
-    end)
-    
-    iconBtn.MouseLeave:Connect(function()
-        if self.Enabled and not self.Selected then
-            TweenService:Create(iconBtn, TweenInfo.new(0.2), {BackgroundTransparency = self.Theme.Icon.BackgroundTransparency}):Play()
-        end
-    end)
-    
-    -- Click handling
-    iconBtn.MouseButton1Click:Connect(function()
-        self:toggle()
-    end)
-    
-    -- Mobile/console support
-    iconBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.KeyCode == Enum.KeyCode.ButtonA then
-            self:toggle()
-        end
-    end)
-    
-    self.Frame = iconFrame
-    self.Button = iconBtn
-end
-
-function Icon:setLabel(text)
-    if not self.Label then
-        self.Label = Instance.new("TextLabel")
-        self.Label.Name = "Label"
-        self.Label.Size = UDim2.new(0, 100, 0, 14)
-        self.Label.Position = UDim2.new(0, 0, 1, 2)
-        self.Label.BackgroundTransparency = 1
-        self.Label.Font = Enum.Font.SourceSans
-        self.Label.TextSize = 12
-        self.Label.TextColor3 = self.Theme.Icon.LabelColor3
-        self.Label.TextXAlignment = Enum.TextXAlignment.Left
-        self.Label.Parent = self.Frame
-    end
-    self.Label.Text = text or ""
-    self.Label.Visible = text ~= ""
-end
-
-function Icon:setCaption(text)
-    if not self.Caption then
-        self.Caption = Instance.new("TextLabel")
-        self.Caption.Name = "Caption"
-        self.Caption.Size = UDim2.new(0, 100, 0, 12)
-        self.Caption.Position = UDim2.new(0, 0, 1, 18)
-        self.Caption.BackgroundTransparency = 1
-        self.Caption.Font = Enum.Font.SourceSansItalic
-        self.Caption.TextSize = 10
-        self.Caption.TextColor3 = self.Theme.Icon.CaptionColor3
-        self.Caption.TextXAlignment = Enum.TextXAlignment.Left
-        self.Caption.Parent = self.Frame
-    end
-    self.Caption.Text = text or ""
-    self.Caption.Visible = text ~= ""
-end
-
-function Icon:setIcon(imageId)
-    self.Button.Text = ""
-    local imageLabel = self.Button:FindFirstChild("ImageLabel") or Instance.new("ImageLabel")
-    imageLabel.Name = "ImageLabel"
-    imageLabel.Size = UDim2.new(0.8, 0, 0.8, 0)
-    imageLabel.Position = UDim2.new(0.1, 0, 0.1, 0)
-    imageLabel.BackgroundTransparency = 1
-    imageLabel.ImageColor3 = self.Theme.Icon.IconColor3
-    imageLabel.Image = imageId and "rbxassetid://" .. imageId or ""
-    imageLabel.Parent = self.Button
-end
-
-function Icon:addDropdown(options)
-    if self.Dropdown then self.Dropdown:Destroy() end
-    
-    local dropdownFrame = Instance.new("Frame")
-    dropdownFrame.Name = "Dropdown"
-    dropdownFrame.Size = UDim2.new(0, 120, 0, #options * 24)
-    dropdownFrame.Position = UDim2.new(0, 0, 1, 36)
-    dropdownFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    dropdownFrame.BackgroundTransparency = 0.2
-    dropdownFrame.Visible = false
-    dropdownFrame.Parent = self.Frame
-    
-    for i, opt in ipairs(options) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 0, 24)
-        btn.Position = UDim2.new(0, 0, 0, (i-1)*24)
-        btn.BackgroundTransparency = 0.3
-        btn.Text = opt
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.Font = Enum.Font.SourceSans
-        btn.TextSize = 14
-        btn.Parent = dropdownFrame
-        
-        btn.MouseButton1Click:Connect(function()
-            self.Clicked:Fire(opt)
-            self.Dropdown.Visible = false
-            self.Selected = false
-            self.Button.BackgroundTransparency = self.Theme.Icon.BackgroundTransparency
-        end)
-    end
-    
-    self.Dropdown = dropdownFrame
-end
-
-function Icon:toggle()
-    if not self.Enabled then return end
-    
-    self.Selected = not self.Selected
-    if self.Selected then
-        self.Button.BackgroundColor3 = self.Theme.Selected.BackgroundColor3
-        self.Button.BackgroundTransparency = self.Theme.Selected.BackgroundTransparency
-        if self.Dropdown then self.Dropdown.Visible = true end
-        self.Selected:Fire()
-    else
-        self.Button.BackgroundColor3 = self.Theme.Icon.BackgroundColor3
-        self.Button.BackgroundTransparency = self.Theme.Icon.BackgroundTransparency
-        if self.Dropdown then self.Dropdown.Visible = false end
-        self.Deselected:Fire()
-    end
-    self.Clicked:Fire()
-end
-
-function Icon:setTheme(theme)
-    self.Theme = theme
-    if self.Button then
-        self.Button.BackgroundColor3 = theme.Icon.BackgroundColor3
-        self.Button.BackgroundTransparency = theme.Icon.BackgroundTransparency
-        local imageLabel = self.Button:FindFirstChild("ImageLabel")
-        if imageLabel then imageLabel.ImageColor3 = theme.Icon.IconColor3 end
-    end
-    if self.Label then self.Label.TextColor3 = theme.Icon.LabelColor3 end
-    if self.Caption then self.Caption.TextColor3 = theme.Icon.CaptionColor3 end
-end
-
-function Icon:setEnabled(bool)
-    self.Enabled = bool
-    self.Frame.Visible = bool and self.Visible
-end
-
-function Icon:setVisible(bool)
-    self.Visible = bool
-    self.Frame.Visible = bool and self.Enabled
-    self:updatePosition()
-end
-
-function Icon:updatePosition()
-    local xPos = 0
-    for _, icon in pairs(Icons) do
-        if icon.Visible and icon.Enabled then
-            icon.Frame.Position = UDim2.new(1, -xPos - 40, 0, 0)
-            xPos = xPos + 40 + icon.Padding
-        end
-    end
-end
-
-function Icon:destroy()
-    Icons[self.UID] = nil
-    self.Frame:Destroy()
-    self.Selected:Destroy()
-    self.Deselected:Destroy()
-    self.Clicked:Destroy()
-end
-
--- Module API
+-- Create a new icon
 function IconModule.new(name)
-    local icon = Icon.new(name)
-    for _, i in pairs(Icons) do
-        i:updatePosition()
-    end
-    return icon
+	local self = {}
+	self.Name = name
+	self.Visible = true
+	self.Clicked = CreateSignal()
+	self._theme = defaultTheme
+	self._dropdownOptions = {}
+
+	-- Make UI elements
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.Size = UDim2.new(0, 120, 0, 36)
+	frame.BackgroundColor3 = defaultTheme.Icon.BackgroundColor3
+	frame.BackgroundTransparency = defaultTheme.Icon.BackgroundTransparency
+	frame.BorderSizePixel = 0
+	frame.Parent = gui
+
+	local label = Instance.new("TextLabel")
+	label.Name = "IconLabel"
+	label.Size = UDim2.new(1, 0, 0, 18)
+	label.Position = UDim2.new(0, 0, 0, 2)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 14
+	label.TextColor3 = defaultTheme.Icon.LabelColor3
+	label.Text = name
+	label.Parent = frame
+
+	local caption = Instance.new("TextLabel")
+	caption.Name = "Caption"
+	caption.Size = UDim2.new(1, 0, 0, 16)
+	caption.Position = UDim2.new(0, 0, 0, 18)
+	caption.BackgroundTransparency = 1
+	caption.Font = Enum.Font.Gotham
+	caption.TextSize = 12
+	caption.TextColor3 = defaultTheme.Icon.CaptionColor3
+	caption.Text = ""
+	caption.Parent = frame
+
+	-- Click area
+	local button = Instance.new("TextButton")
+	button.Name = "ClickArea"
+	button.Size = UDim2.new(1, 0, 1, 0)
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.Parent = frame
+
+	-- Dropdown
+	local dropdown = Instance.new("Frame")
+	dropdown.Name = "Dropdown"
+	dropdown.Size = UDim2.new(0, 120, 0, 0)
+	dropdown.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	dropdown.Visible = false
+	dropdown.ClipsDescendants = true
+	dropdown.Parent = gui
+
+	local layout = Instance.new("UIListLayout", dropdown)
+	layout.Padding = UDim.new(0, 2)
+
+	-- Internal state
+	local dropdownOpen = false
+
+	local function refreshDropdown()
+		for _,v in ipairs(dropdown:GetChildren()) do
+			if v:IsA("TextButton") then v:Destroy() end
+		end
+		for _,option in ipairs(self._dropdownOptions) do
+			local opt = Instance.new("TextButton")
+			opt.Size = UDim2.new(1, -4, 0, 24)
+			opt.Position = UDim2.new(0, 2, 0, 0)
+			opt.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			opt.TextColor3 = Color3.fromRGB(240, 240, 240)
+			opt.Font = Enum.Font.Gotham
+			opt.TextSize = 13
+			opt.Text = option
+			opt.Parent = dropdown
+			opt.MouseButton1Click:Connect(function()
+				self.Clicked:Fire(option)
+				dropdown.Visible = false
+				dropdownOpen = false
+			end)
+		end
+		dropdown.Size = UDim2.new(0, 120, 0, math.min(#self._dropdownOptions * 26, 200))
+	end
+
+	-- Button click
+	button.MouseButton1Click:Connect(function()
+		if #self._dropdownOptions > 0 then
+			dropdownOpen = not dropdownOpen
+			dropdown.Visible = dropdownOpen
+			dropdown.Position = UDim2.new(0, frame.AbsolutePosition.X, 0, frame.AbsolutePosition.Y + 38)
+			refreshDropdown()
+		else
+			self.Clicked:Fire()
+		end
+	end)
+
+	-- Public methods
+	function self:setIcon(id) self.IconId = id end
+	function self:setLabel(txt) label.Text = txt end
+	function self:setCaption(txt) caption.Text = txt end
+	function self:addDropdown(list)
+		self._dropdownOptions = list or {}
+		refreshDropdown()
+	end
+	function self:setTheme(theme)
+		self._theme = theme
+		applyTheme(self, theme)
+	end
+	function self:setVisible(v)
+		self.Visible = v
+		frame.Visible = v
+	end
+
+	-- Store references
+	self.Frame = frame
+	self.IconLabel = label
+	self.Caption = caption
+	self.Dropdown = dropdown
+
+	-- layout icons horizontally
+	local offset = (#icons) * 130
+	frame.Position = UDim2.new(0, offset + 6, 0, 6)
+
+	icons[#icons + 1] = self
+
+	return self
 end
 
+-- Return all icons
 function IconModule.getIcons()
-    return Icons
+	return icons
 end
 
-function IconModule.setTopbarEnabled(bool)
-    screenGui.Enabled = bool
-end
-
--- Auto-create a test icon
-local testIcon = IconModule.new("Test")
-testIcon:setLabel("Test Icon")
-testIcon:setCaption("Click to test!")
-testIcon:setIcon(4483345998)
-
-return IconModuleow button)
-        overflowContainer.Visible = true
-        -- Move excess to overflow (simplified: just hide for now)
-    end
-    
-    -- Position this icon
-    local xPos = 0
-    for uid, icon in pairs(Icons) do
-        if icon.UID == self.UID then break end
-        if icon.Visible and icon.Enabled then
-            xPos = xPos + 40 + icon.Padding
-        end
-    end
-    self.Frame.Position = UDim2.new(0, -xPos, 0, 0)
-end
-
--- Module API
-function IconModule.new(name)
-    local icon = Icon.new(name)
-    -- Auto-update positions for all
-    for _, i in pairs(Icons) do
-        i:updatePosition()
-    end
-    return icon
-end
-
-function IconModule.getIcons()
-    return Icons
-end
-
-function IconModule.getIcon(uid)
-    return Icons[uid]
-end
-
-function IconModule.setTopbarEnabled(bool)
-    screenGui.Enabled = bool
+return IconModule
 end
 
 -- Demo on load
