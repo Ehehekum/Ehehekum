@@ -1,300 +1,157 @@
--- TopBarPlus.lua
--- Single-file TopBar-like UI library for Roblox
--- Usage: local TopBar = loadstring(game:HttpGet("RAW_URL"))(); local tb = TopBar.new("Title")
+--[[  
+    TopLitePlus.lua
+    Lightweight TopBar-style GUI Library for Roblox
+    Versi: 1.0
+    Gaya: Flat minimal, mirip TopBarPlus
+    Dibuat oleh: Arka D. Vizura (Roblox Visual Designer Hybrid)
+--]]
 
-local TopBarLib = {}
-TopBarLib.__index = TopBarLib
+local TopLitePlus = {}
+TopLitePlus.__index = TopLitePlus
 
--- Services
+--== Service ==--
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-local LocalPlayer = Players.LocalPlayer
-
--- Utilities
-local function new(class, props)
-    local inst = Instance.new(class)
-    if props then
-        for k,v in pairs(props) do
-            if k ~= "Parent" then
-                inst[k] = v
-            end
-        end
-        if props.Parent then inst.Parent = props.Parent end
-    end
-    return inst
+--== Utility ==--
+local function create(class, props)
+	local inst = Instance.new(class)
+	for k, v in pairs(props or {}) do
+		inst[k] = v
+	end
+	return inst
 end
 
-local function round(n) return math.floor(n+0.5) end
+--== CLASS: DropdownButton ==--
+local DropdownButton = {}
+DropdownButton.__index = DropdownButton
 
--- Default theme
-local DefaultTheme = {
-    Background = Color3.fromRGB(30,30,30),
-    Accent = Color3.fromRGB(0,170,255),
-    Text = Color3.fromRGB(230,230,230),
-    SubText = Color3.fromRGB(180,180,180),
-    Corner = 8,
-    ButtonHeight = 30,
-    Padding = 8,
-}
+function DropdownButton:AddDropdown(items, callback)
+	local dropdown = create("Frame", {
+		Name = "Dropdown",
+		Parent = self.Button,
+		Size = UDim2.new(1, 0, 0, #items * 28),
+		Position = UDim2.new(0, 0, 1, 4),
+		BackgroundColor3 = Color3.fromHex("#1E293B"),
+		BackgroundTransparency = 0.05,
+		Visible = false,
+		ZIndex = 10,
+	})
+	create("UICorner", {Parent = dropdown, CornerRadius = UDim.new(0, 6)})
 
--- Create main GUI (one per player)
-local function ensurePlayerGui()
-    if not LocalPlayer then
-        -- running in non-player environment (tooling) — create ScreenGui in CoreGui fallback
-        local sg = Instance.new("ScreenGui")
-        sg.Name = "TopBarPlus_Fallback"
-        sg.Parent = game:GetService("CoreGui")
-        return sg
-    end
-    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not pg then
-        pg = Instance.new("PlayerGui")
-        pg.Parent = LocalPlayer
-    end
-    local sg = pg:FindFirstChild("TopBarPlus_MainGui")
-    if not sg then
-        sg = Instance.new("ScreenGui")
-        sg.Name = "TopBarPlus_MainGui"
-        sg.ResetOnSpawn = false
-        sg.Parent = pg
-    end
-    return sg
+	local layout = create("UIListLayout", {
+		Parent = dropdown,
+		FillDirection = Enum.FillDirection.Vertical,
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 2)
+	})
+
+	for i, name in ipairs(items) do
+		local opt = create("TextButton", {
+			Parent = dropdown,
+			Name = "Option_"..name,
+			Size = UDim2.new(1, -4, 0, 24),
+			BackgroundColor3 = Color3.fromHex("#334155"),
+			Text = name,
+			TextColor3 = Color3.fromHex("#F9FAFB"),
+			Font = Enum.Font.SourceSansSemibold,
+			TextSize = 14,
+			BorderSizePixel = 0,
+			AutoButtonColor = false,
+			ZIndex = 11,
+		})
+		create("UICorner", {Parent = opt, CornerRadius = UDim.new(0, 5)})
+
+		opt.MouseEnter:Connect(function()
+			TweenService:Create(opt, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#475569")}):Play()
+		end)
+		opt.MouseLeave:Connect(function()
+			TweenService:Create(opt, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#334155")}):Play()
+		end)
+		opt.MouseButton1Click:Connect(function()
+			dropdown.Visible = false
+			if callback then callback(name) end
+		end)
+	end
+
+	self.Dropdown = dropdown
+
+	-- toggle logic
+	self.Button.MouseButton1Click:Connect(function()
+		dropdown.Visible = not dropdown.Visible
+	end)
+
+	return dropdown
 end
 
--- Main class constructor
-function TopBarLib.new(title, theme)
-    local self = setmetatable({}, TopBarLib)
-    self.Title = title or "TopBar"
-    self.Theme = theme or DefaultTheme
-    self._gui = ensurePlayerGui()
-    self._root = self:_createRoot()
-    self._buttons = {}
-    self._dropdowns = {}
-    return self
+--== CLASS: TopLiteBar ==--
+function TopLitePlus.new(name)
+	local self = setmetatable({}, TopLitePlus)
+
+	self.Name = name or "TopLiteBar"
+	self.Buttons = {}
+
+	local gui = create("ScreenGui", {
+		Name = self.Name,
+		Parent = playerGui,
+		ResetOnSpawn = false,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	})
+
+	local bar = create("Frame", {
+		Parent = gui,
+		Name = "TopBar",
+		BackgroundColor3 = Color3.fromHex("#111827"),
+		BackgroundTransparency = 0.3,
+		Size = UDim2.new(1, 0, 0, 36),
+		Position = UDim2.new(0, 0, 0, 0),
+		BorderSizePixel = 0,
+		ZIndex = 5,
+	})
+	create("UIListLayout", {
+		Parent = bar,
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 6),
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+	})
+
+	self.Gui = gui
+	self.Bar = bar
+	return self
 end
 
-function TopBarLib:_createRoot()
-    -- root frame (top bar)
-    local root = new("Frame", {
-        Name = "TopBarPlusRoot_" .. tostring(self.Title),
-        Parent = self._gui,
-        AnchorPoint = Vector2.new(0.5, 0),
-        Position = UDim2.new(0.5, 0, 0, 6),
-        Size = UDim2.new(0.6, 0, 0, 40),
-        BackgroundColor3 = self.Theme.Background,
-        BorderSizePixel = 0,
-        Visible = true,
-    })
+function TopLitePlus:AddButton(icon, tooltip)
+	local button = create("TextButton", {
+		Parent = self.Bar,
+		Name = "Button_"..tooltip,
+		Size = UDim2.new(0, 42, 1, -8),
+		Position = UDim2.new(0, 0, 0, 4),
+		BackgroundColor3 = Color3.fromHex("#1E293B"),
+		Text = icon or "🔘",
+		TextSize = 18,
+		TextColor3 = Color3.fromHex("#F9FAFB"),
+		Font = Enum.Font.SourceSansSemibold,
+		BorderSizePixel = 0,
+		AutoButtonColor = false,
+		ZIndex = 6,
+	})
+	create("UICorner", {Parent = button, CornerRadius = UDim.new(0, 6)})
 
-    local uic = new("UICorner", {Parent = root, CornerRadius = UDim.new(0, self.Theme.Corner)})
-    local pad = new("UIPadding", {Parent = root, PaddingLeft = UDim.new(0, self.Theme.Padding), PaddingRight = UDim.new(0, self.Theme.Padding), PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6)})
+	button.MouseEnter:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#334155")}):Play()
+	end)
+	button.MouseLeave:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#1E293B")}):Play()
+	end)
 
-    -- left: title label
-    local titleLbl = new("TextLabel", {
-        Name = "Title",
-        Parent = root,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0.3, 0, 1, 0),
-        Position = UDim2.new(0, 0, 0, 0),
-        Text = self.Title,
-        TextColor3 = self.Theme.Text,
-        TextSize = 16,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Font = Enum.Font.GothamBold,
-    })
-
-    -- container for buttons (right)
-    local container = new("Frame", {
-        Name = "Container",
-        Parent = root,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0.7, 0, 1, 0),
-        Position = UDim2.new(0.3, 0, 0, 0),
-    })
-    local h = new("UIListLayout", {Parent = container, FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), HorizontalAlignment = Enum.HorizontalAlignment.Right, SortOrder = Enum.SortOrder.LayoutOrder})
-    local ph = new("UIPadding", {Parent = container, PaddingRight = UDim.new(0, 6)})
-
-    -- toggle button (small)
-    local toggleBtn = new("TextButton", {
-        Name = "ToggleButton",
-        Parent = container,
-        Size = UDim2.new(0, 28, 1, -8),
-        BackgroundTransparency = 0,
-        BackgroundColor3 = self.Theme.Background,
-        Text = "≡",
-        TextColor3 = self.Theme.Text,
-        Font = Enum.Font.Gotham,
-        TextSize = 18,
-        BorderSizePixel = 0,
-        AutoButtonColor = true,
-    })
-    new("UICorner", {Parent = toggleBtn, CornerRadius = UDim.new(0, round(self.Theme.Corner/2))})
-    toggleBtn.MouseButton1Click:Connect(function()
-        root.Visible = not root.Visible
-    end)
-
-    -- notification container
-    local notifFrame = new("Folder", {Parent = self._gui, Name = "TopBarPlus_Notifs"})
-    return root
+	local newBtn = setmetatable({Button = button, Tooltip = tooltip}, DropdownButton)
+	table.insert(self.Buttons, newBtn)
+	return newBtn
 end
 
--- Internal helper to make a button element
-function TopBarLib:_makeButton(opts)
-    local container = self._root:FindFirstChild("Container")
-    local btn = new("TextButton", {
-        Name = "TB_Button",
-        Parent = container,
-        Size = UDim2.new(0, 120, 1, -8),
-        BackgroundColor3 = Color3.fromRGB(45,45,45),
-        BorderSizePixel = 0,
-        Text = opts.Text or "Button",
-        TextColor3 = self.Theme.Text,
-        Font = Enum.Font.Gotham,
-        TextSize = 14,
-        AutoButtonColor = true,
-    })
-    new("UICorner", {Parent = btn, CornerRadius = UDim.new(0, round(self.Theme.Corner/2))})
-    if opts.Tooltip then
-        local tt = new("TextLabel", {
-            Name = "Tooltip",
-            Parent = btn,
-            BackgroundTransparency = 0,
-            BackgroundColor3 = Color3.new(0,0,0),
-            Text = opts.Tooltip,
-            TextColor3 = self.Theme.Text,
-            Font = Enum.Font.Gotham,
-            TextSize = 12,
-            Size = UDim2.new(0, 140, 0, 24),
-            Position = UDim2.new(0, 0, 1, 6),
-            Visible = false,
-            BorderSizePixel = 0,
-            ZIndex = 10,
-        })
-        new("UICorner", {Parent = tt, CornerRadius = UDim.new(0,6)})
-        btn.MouseEnter:Connect(function() tt.Visible = true end)
-        btn.MouseLeave:Connect(function() tt.Visible = false end)
-    end
-    btn.MouseButton1Click:Connect(function()
-        if opts.Callback then
-            local ok, err = pcall(opts.Callback)
-            if not ok then warn("TopBarPlus button callback error:", err) end
-        end
-    end)
-    return btn
-end
-
--- Add a simple button
--- opts: {Text, Tooltip, Callback}
-function TopBarLib:AddButton(opts)
-    opts = opts or {}
-    local btn = self:_makeButton(opts)
-    table.insert(self._buttons, btn)
-    return btn
-end
-
--- Dropdown implementation
-function TopBarLib:AddDropdown(opts)
-    opts = opts or {}
-    local container = self._root:FindFirstChild("Container")
-    local btn = new("TextButton", {
-        Name = "TB_Dropdown",
-        Parent = container,
-        Size = UDim2.new(0, 140, 1, -8),
-        BackgroundColor3 = Color3.fromRGB(45,45,45),
-        BorderSizePixel = 0,
-        Text = opts.Text or "Dropdown",
-        TextColor3 = self.Theme.Text,
-        Font = Enum.Font.Gotham,
-        TextSize = 14,
-        AutoButtonColor = true,
-    })
-    new("UICorner", {Parent = btn, CornerRadius = UDim.new(0, round(self.Theme.Corner/2))})
-
-    local list = new("Frame", {
-        Name = "List",
-        Parent = self._gui,
-        BackgroundColor3 = Color3.fromRGB(25,25,25),
-        BorderSizePixel = 0,
-        Size = UDim2.new(0, 180, 0, 0),
-        Position = UDim2.new(0.5, -90, 0, 48),
-        Visible = false,
-        ZIndex = 50,
-    })
-    new("UICorner", {Parent = list, CornerRadius = UDim.new(0,6)})
-    local layout = new("UIListLayout", {Parent = list, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0,4)})
-    local padding = new("UIPadding", {Parent = list, PaddingLeft = UDim.new(0,6), PaddingRight = UDim.new(0,6), PaddingTop = UDim.new(0,6), PaddingBottom = UDim.new(0,6)})
-
-    local function rebuild(items)
-        for _,v in pairs(list:GetChildren()) do
-            if v:IsA("TextButton") or v:IsA("TextLabel") then v:Destroy() end
-        end
-        local totalH = 0
-        for i,item in ipairs(items or {}) do
-            local itBtn = new("TextButton", {
-                Parent = list,
-                BackgroundTransparency = 1,
-                Size = UDim2.new(1,0,0,30),
-                Text = tostring(item),
-                TextColor3 = self.Theme.Text,
-                Font = Enum.Font.Gotham,
-                TextSize = 14,
-            })
-            itBtn.MouseButton1Click:Connect(function()
-                list.Visible = false
-                if opts.OnSelect then
-                    pcall(opts.OnSelect, item)
-                end
-            end)
-            totalH = totalH + 34
-        end
-        list.Size = UDim2.new(0, 180, 0, math.clamp(totalH, 0, 300))
-    end
-
-    btn.MouseButton1Click:Connect(function()
-        list.Position = UDim2.new(0.5, -90, 0, 48) -- centre-ish under bar
-        list.Visible = not list.Visible
-    end)
-
-    if opts.Items then rebuild(opts.Items) end
-
-    local dropdownObj = {
-        Button = btn,
-        List = list,
-        SetItems = function(_, items) rebuild(items) end,
-        Destroy = function()
-            btn:Destroy()
-            list:Destroy()
-        end
-    }
-    table.insert(self._dropdowns, dropdownObj)
-    return dropdownObj
-end
-
--- Simple toast notification
-function TopBarLib:Notify(title, text, duration)
-    duration = duration or 5
-    local notifFolder = self._gui:FindFirstChild("TopBarPlus_Notifs") or self._gui:FindFirstChildOfClass("Folder")
-    if not notifFolder then
-        notifFolder = Instance.new("Folder", self._gui)
-        notifFolder.Name = "TopBarPlus_Notifs"
-    end
-
-    local frame = new("Frame", {
-        Parent = notifFolder,
-        Size = UDim2.new(0, 300, 0, 80),
-        Position = UDim2.new(0.5, -150, 0, 80),
-        BackgroundColor3 = Color3.fromRGB(40,40,40),
-        BorderSizePixel = 0,
-        ZIndex = 100,
-    })
-    new("UICorner", {Parent = frame, CornerRadius = UDim.new(0,6)})
-    local t = new("TextLabel", {
-        Parent = frame,
-        Size = UDim2.new(1, -12, 0, 28),
-        Position = UDim2.new(0, 6, 0, 6),
-        BackgroundTransparency = 1,
+return TopLitePlus1,
         Text = title or "",
         Font = Enum.Font.GothamBold,
         TextSize = 14,
