@@ -1,231 +1,330 @@
---[[  
-    TopLitePlus.lua
-    Lightweight TopBar-style GUI Library for Roblox
-    Versi: 1.0
-    Gaya: Flat minimal, mirip TopBarPlus
-    Dibuat oleh: Arka D. Vizura (Roblox Visual Designer Hybrid)
---]]
+--!strict
+-- TopbarPlus Clone Script
+-- Compatible with GitHub raw hosting and loadstring
 
-local TopLitePlus = {}
-TopLitePlus.__index = TopLitePlus
+local TopbarPlus = {}
+TopbarPlus.__index = TopbarPlus
 
---== Service ==--
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
---== Utility ==--
-local function create(class, props)
-	local inst = Instance.new(class)
-	for k, v in pairs(props or {}) do
-		inst[k] = v
-	end
-	return inst
-end
+-- Create ScreenGui container
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TopbarPlusClone"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
 
---== CLASS: DropdownButton ==--
-local DropdownButton = {}
-DropdownButton.__index = DropdownButton
+local container = Instance.new("Frame")
+container.Name = "IconContainer"
+container.Size = UDim2.new(1, 0, 0, 36)
+container.Position = UDim2.new(0, 0, 0, 0)
+container.BackgroundTransparency = 1
+container.Parent = screenGui
 
-function DropdownButton:AddDropdown(items, callback)
-	local dropdown = create("Frame", {
-		Name = "Dropdown",
-		Parent = self.Button,
-		Size = UDim2.new(1, 0, 0, #items * 28),
-		Position = UDim2.new(0, 0, 1, 4),
-		BackgroundColor3 = Color3.fromHex("#1E293B"),
-		BackgroundTransparency = 0.05,
-		Visible = false,
-		ZIndex = 10,
-	})
-	create("UICorner", {Parent = dropdown, CornerRadius = UDim.new(0, 6)})
+local iconsFrame = Instance.new("Frame")
+iconsFrame.Name = "Icons"
+iconsFrame.Size = UDim2.new(0, 0, 1, 0)
+iconsFrame.Position = UDim2.new(0, 100, 0, 0)
+iconsFrame.BackgroundTransparency = 1
+iconsFrame.Parent = container
 
-	local layout = create("UIListLayout", {
-		Parent = dropdown,
-		FillDirection = Enum.FillDirection.Vertical,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 2)
-	})
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.FillDirection = Enum.FillDirection.Horizontal
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.Parent = iconsFrame
 
-	for i, name in ipairs(items) do
-		local opt = create("TextButton", {
-			Parent = dropdown,
-			Name = "Option_"..name,
-			Size = UDim2.new(1, -4, 0, 24),
-			BackgroundColor3 = Color3.fromHex("#334155"),
-			Text = name,
-			TextColor3 = Color3.fromHex("#F9FAFB"),
-			Font = Enum.Font.SourceSansSemibold,
-			TextSize = 14,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			ZIndex = 11,
-		})
-		create("UICorner", {Parent = opt, CornerRadius = UDim.new(0, 5)})
+-- Icon class
+local Icon = {}
+Icon.__index = Icon
 
-		opt.MouseEnter:Connect(function()
-			TweenService:Create(opt, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#475569")}):Play()
-		end)
-		opt.MouseLeave:Connect(function()
-			TweenService:Create(opt, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#334155")}):Play()
-		end)
-		opt.MouseButton1Click:Connect(function()
-			dropdown.Visible = false
-			if callback then callback(name) end
-		end)
-	end
-
-	self.Dropdown = dropdown
-
-	-- toggle logic
-	self.Button.MouseButton1Click:Connect(function()
-		dropdown.Visible = not dropdown.Visible
+function Icon.new(name: string)
+	local self = setmetatable({}, Icon)
+	
+	self.name = name
+	self.isSelected = false
+	self.enabled = true
+	self.toggleStatus = false
+	self.dropdownOpen = false
+	self.connections = {}
+	self.dropdownItems = {}
+	
+	-- Create button
+	self.button = Instance.new("TextButton")
+	self.button.Name = name
+	self.button.Size = UDim2.new(0, 32, 0, 32)
+	self.button.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
+	self.button.BorderSizePixel = 0
+	self.button.Text = ""
+	self.button.AutoButtonColor = false
+	self.button.Parent = iconsFrame
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = self.button
+	
+	-- Icon image
+	self.iconImage = Instance.new("ImageLabel")
+	self.iconImage.Name = "Icon"
+	self.iconImage.Size = UDim2.new(0, 20, 0, 20)
+	self.iconImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+	self.iconImage.AnchorPoint = Vector2.new(0.5, 0.5)
+	self.iconImage.BackgroundTransparency = 1
+	self.iconImage.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+	self.iconImage.Parent = self.button
+	
+	-- Label for text icons
+	self.label = Instance.new("TextLabel")
+	self.label.Name = "Label"
+	self.label.Size = UDim2.new(1, 0, 1, 0)
+	self.label.BackgroundTransparency = 1
+	self.label.Text = name:sub(1, 1):upper()
+	self.label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	self.label.TextSize = 16
+	self.label.Font = Enum.Font.GothamBold
+	self.label.Visible = false
+	self.label.Parent = self.button
+	
+	-- Dropdown menu
+	self.dropdown = Instance.new("Frame")
+	self.dropdown.Name = "Dropdown"
+	self.dropdown.Size = UDim2.new(0, 200, 0, 0)
+	self.dropdown.Position = UDim2.new(0, 0, 1, 5)
+	self.dropdown.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
+	self.dropdown.BorderSizePixel = 0
+	self.dropdown.Visible = false
+	self.dropdown.ClipsDescendants = true
+	self.dropdown.Parent = self.button
+	
+	local dropdownCorner = Instance.new("UICorner")
+	dropdownCorner.CornerRadius = UDim.new(0, 8)
+	dropdownCorner.Parent = self.dropdown
+	
+	self.dropdownList = Instance.new("UIListLayout")
+	self.dropdownList.SortOrder = Enum.SortOrder.LayoutOrder
+	self.dropdownList.Padding = UDim.new(0, 2)
+	self.dropdownList.Parent = self.dropdown
+	
+	local dropdownPadding = Instance.new("UIPadding")
+	dropdownPadding.PaddingTop = UDim.new(0, 5)
+	dropdownPadding.PaddingBottom = UDim.new(0, 5)
+	dropdownPadding.PaddingLeft = UDim.new(0, 5)
+	dropdownPadding.PaddingRight = UDim.new(0, 5)
+	dropdownPadding.Parent = self.dropdown
+	
+	-- Button click handler
+	self.connections.clicked = self.button.MouseButton1Click:Connect(function()
+		self:_onClick()
 	end)
-
-	return dropdown
-end
-
---== CLASS: TopLiteBar ==--
-function TopLitePlus.new(name)
-	local self = setmetatable({}, TopLitePlus)
-
-	self.Name = name or "TopLiteBar"
-	self.Buttons = {}
-
-	local gui = create("ScreenGui", {
-		Name = self.Name,
-		Parent = playerGui,
-		ResetOnSpawn = false,
-		ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	})
-
-	local bar = create("Frame", {
-		Parent = gui,
-		Name = "TopBar",
-		BackgroundColor3 = Color3.fromHex("#111827"),
-		BackgroundTransparency = 0.3,
-		Size = UDim2.new(1, 0, 0, 36),
-		Position = UDim2.new(0, 0, 0, 0),
-		BorderSizePixel = 0,
-		ZIndex = 5,
-	})
-	create("UIListLayout", {
-		Parent = bar,
-		FillDirection = Enum.FillDirection.Horizontal,
-		Padding = UDim.new(0, 6),
-		HorizontalAlignment = Enum.HorizontalAlignment.Left,
-	})
-
-	self.Gui = gui
-	self.Bar = bar
+	
+	-- Hover effects
+	self.connections.mouseEnter = self.button.MouseEnter:Connect(function()
+		if not self.isSelected then
+			self:_tween(self.button, {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}, 0.1)
+		end
+	end)
+	
+	self.connections.mouseLeave = self.button.MouseLeave:Connect(function()
+		if not self.isSelected then
+			self:_tween(self.button, {BackgroundColor3 = Color3.fromRGB(31, 31, 31)}, 0.1)
+		end
+	end)
+	
 	return self
 end
 
-function TopLitePlus:AddButton(icon, tooltip)
-	local button = create("TextButton", {
-		Parent = self.Bar,
-		Name = "Button_"..tooltip,
-		Size = UDim2.new(0, 42, 1, -8),
-		Position = UDim2.new(0, 0, 0, 4),
-		BackgroundColor3 = Color3.fromHex("#1E293B"),
-		Text = icon or "🔘",
-		TextSize = 18,
-		TextColor3 = Color3.fromHex("#F9FAFB"),
-		Font = Enum.Font.SourceSansSemibold,
-		BorderSizePixel = 0,
-		AutoButtonColor = false,
-		ZIndex = 6,
-	})
-	create("UICorner", {Parent = button, CornerRadius = UDim.new(0, 6)})
+function Icon:setImage(imageId: string)
+	if imageId and imageId ~= "" then
+		self.iconImage.Image = imageId
+		self.iconImage.Visible = true
+		self.label.Visible = false
+	else
+		self.iconImage.Visible = false
+		self.label.Visible = true
+	end
+	return self
+end
 
-	button.MouseEnter:Connect(function()
-		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#334155")}):Play()
+function Icon:setLabel(text: string)
+	self.label.Text = text
+	if self.iconImage.Image == "rbxasset://textures/ui/GuiImagePlaceholder.png" or self.iconImage.Image == "" then
+		self.iconImage.Visible = false
+		self.label.Visible = true
+	end
+	return self
+end
+
+function Icon:setEnabled(enabled: boolean)
+	self.enabled = enabled
+	self.button.Visible = enabled
+	return self
+end
+
+function Icon:select()
+	self.isSelected = true
+	self:_tween(self.button, {BackgroundColor3 = Color3.fromRGB(0, 162, 255)}, 0.1)
+	return self
+end
+
+function Icon:deselect()
+	self.isSelected = false
+	self:_tween(self.button, {BackgroundColor3 = Color3.fromRGB(31, 31, 31)}, 0.1)
+	if self.dropdownOpen then
+		self:_closeDropdown()
+	end
+	return self
+end
+
+function Icon:setToggleFunction(callback)
+	self.toggleCallback = callback
+	return self
+end
+
+function Icon:addDropdownItem(itemName: string, callback)
+	local item = Instance.new("TextButton")
+	item.Name = itemName
+	item.Size = UDim2.new(1, -10, 0, 30)
+	item.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	item.BorderSizePixel = 0
+	item.Text = itemName
+	item.TextColor3 = Color3.fromRGB(255, 255, 255)
+	item.TextSize = 14
+	item.Font = Enum.Font.Gotham
+	item.TextXAlignment = Enum.TextXAlignment.Left
+	item.AutoButtonColor = false
+	item.Parent = self.dropdown
+	
+	local itemCorner = Instance.new("UICorner")
+	itemCorner.CornerRadius = UDim.new(0, 6)
+	itemCorner.Parent = item
+	
+	local itemPadding = Instance.new("UIPadding")
+	itemPadding.PaddingLeft = UDim.new(0, 10)
+	itemPadding.Parent = item
+	
+	item.MouseEnter:Connect(function()
+		self:_tween(item, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}, 0.1)
 	end)
-	button.MouseLeave:Connect(function()
-		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromHex("#1E293B")}):Play()
+	
+	item.MouseLeave:Connect(function()
+		self:_tween(item, {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}, 0.1)
 	end)
-
-	local newBtn = setmetatable({Button = button, Tooltip = tooltip}, DropdownButton)
-	table.insert(self.Buttons, newBtn)
-	return newBtn
+	
+	item.MouseButton1Click:Connect(function()
+		if callback then
+			callback()
+		end
+		self:_closeDropdown()
+	end)
+	
+	table.insert(self.dropdownItems, item)
+	self:_updateDropdownSize()
+	
+	return self
 end
 
-return TopLitePlus1,
-        Text = title or "",
-        Font = Enum.Font.GothamBold,
-        TextSize = 14,
-        TextColor3 = self.Theme.Text,
-        TextXAlignment = Enum.TextXAlignment.Left,
-    })
-    local d = new("TextLabel", {
-        Parent = frame,
-        Size = UDim2.new(1, -12, 1, -40),
-        Position = UDim2.new(0, 6, 0, 34),
-        BackgroundTransparency = 1,
-        Text = text or "",
-        Font = Enum.Font.Gotham,
-        TextSize = 13,
-        TextColor3 = self.Theme.SubText,
-        TextWrapped = true,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
-    })
-
-    -- appear tween
-    frame.AnchorPoint = Vector2.new(0.5,0)
-    frame.Position = UDim2.new(0.5, -150, 0, 20)
-    frame.BackgroundTransparency = 1
-    tweenProps = {BackgroundTransparency = 0}
-    local tw = TweenService:Create(frame, TweenInfo.new(0.22), {BackgroundTransparency = 0})
-    tw:Play()
-
-    -- auto destroy
-    delay(duration, function()
-        local t2 = TweenService:Create(frame, TweenInfo.new(0.22), {BackgroundTransparency = 1, Position = UDim2.new(0.5, -150, 0, 20)})
-        t2:Play()
-        t2.Completed:Wait()
-        frame:Destroy()
-    end)
-    return frame
+function Icon:destroy()
+	for _, connection in pairs(self.connections) do
+		connection:Disconnect()
+	end
+	self.button:Destroy()
 end
 
--- Theme setter
-function TopBarLib:SetTheme(theme)
-    for k,v in pairs(theme or {}) do self.Theme[k] = v end
-    -- apply basic colors
-    if self._root then
-        self._root.BackgroundColor3 = self.Theme.Background
-        local title = self._root:FindFirstChild("Title")
-        if title then title.TextColor3 = self.Theme.Text end
-        for _,btn in pairs(self._buttons) do
-            if btn and btn:IsA("GuiObject") then
-                btn.TextColor3 = self.Theme.Text
-                if btn.BackgroundColor3 then
-                    -- keep visual contrast
-                end
-            end
-        end
-    end
+function Icon:_onClick()
+	if not self.enabled then return end
+	
+	if #self.dropdownItems > 0 then
+		if self.dropdownOpen then
+			self:_closeDropdown()
+		else
+			self:_openDropdown()
+		end
+	else
+		self.toggleStatus = not self.toggleStatus
+		if self.toggleCallback then
+			self.toggleCallback(self.toggleStatus)
+		end
+		
+		if self.toggleStatus then
+			self:select()
+		else
+			self:deselect()
+		end
+	end
 end
 
--- Toggle visibility
-function TopBarLib:Toggle()
-    if self._root then
-        self._root.Visible = not self._root.Visible
-    end
+function Icon:_openDropdown()
+	self.dropdownOpen = true
+	self:select()
+	self.dropdown.Visible = true
+	self:_updateDropdownSize()
+	self:_tween(self.dropdown, {Size = UDim2.new(0, 200, 0, self.dropdownList.AbsoluteContentSize.Y + 10)}, 0.2)
 end
 
--- Destroy library GUI
-function TopBarLib:Destroy()
-    if self._root then self._root:Destroy() end
-    local nf = self._gui:FindFirstChild("TopBarPlus_Notifs")
-    if nf then nf:Destroy() end
+function Icon:_closeDropdown()
+	self.dropdownOpen = false
+	self:deselect()
+	self:_tween(self.dropdown, {Size = UDim2.new(0, 200, 0, 0)}, 0.2)
+	task.wait(0.2)
+	if not self.dropdownOpen then
+		self.dropdown.Visible = false
+	end
 end
 
--- Return library table factory
-return setmetatable({}, {
-    __call = function(_, ...)
-        return TopBarLib.new(...)
-    end
-})
+function Icon:_updateDropdownSize()
+	self.dropdown.Size = UDim2.new(0, 200, 0, self.dropdownList.AbsoluteContentSize.Y + 10)
+end
+
+function Icon:_tween(instance, properties, duration)
+	local tween = TweenService:Create(
+		instance,
+		TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		properties
+	)
+	tween:Play()
+	return tween
+end
+
+-- TopbarPlus main functions
+function TopbarPlus.new(name: string)
+	return Icon.new(name)
+end
+
+function TopbarPlus:setTopbarEnabled(enabled: boolean)
+	container.Visible = enabled
+end
+
+-- Close all dropdowns when clicking outside
+UserInputService.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		for _, child in pairs(iconsFrame:GetChildren()) do
+			if child:IsA("TextButton") then
+				local icon = getmetatable(child)
+				if icon and icon.dropdownOpen then
+					local dropdown = child:FindFirstChild("Dropdown")
+					if dropdown then
+						local mousePos = UserInputService:GetMouseLocation()
+						local dropdownPos = dropdown.AbsolutePosition
+						local dropdownSize = dropdown.AbsoluteSize
+						
+						if mousePos.X < dropdownPos.X or mousePos.X > dropdownPos.X + dropdownSize.X or
+						   mousePos.Y < dropdownPos.Y or mousePos.Y > dropdownPos.Y + dropdownSize.Y then
+							-- Mouse is outside dropdown, close it
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+return TopbarPlus
